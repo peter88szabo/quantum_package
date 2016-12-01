@@ -23,10 +23,17 @@ The task server is written in OCaml. All the processes communicate with ZeroMQ
 (asynchronous TCP).
 
 
-Benchmark
----------
+Compiling the code
+------------------
 
-Download the code here : `https://codeload.github.com/scemama/quantum_package/zip/calmip`
+Download the code here : https://codeload.github.com/scemama/quantum_package/zip/calmip`
+or using git:
+
+```bash
+git clone -b calmip https://github.com/scemama/quantum_package.git
+```
+
+and go into the ``quantum_package`` directory.
 
 To compile the code, you will need a configuration file that fits your
 architecture.  Examples are in the `config` directory. Copy a file which fits
@@ -52,7 +59,7 @@ Now, install the modules necessary for the benchmark:
 
 ```bash
 cd $QP_ROOT
-qp_module.py install SCF Full_CI_ZMQ
+qp_module.py install Hartree_Fock Full_CI_ZMQ MP2
 ```
 
 Compile the program
@@ -62,9 +69,24 @@ cd $QP_ROOT
 ninja
 ```
 
-And run the benchmark:
+Benchmark
+---------
+
+Go into the `CALMIP` directory and extract the data set :
 
 ```bash
 cd ${QP_ROOT}/CALMIP
+tar -zxvf FeO4.tar.gz
+```
+
+Run the benchmark :
+
+```
 qp_run fci_zmq FeO4 > FeO4.out
 ```
+
+There is a reference file `FeO4.ref` in the directory to check that the results are correct.
+The maximum required memory s 96 GB and the run requires roughly 40 minutes on 64 cores.
+
+
+If there is a problem with the dataset, it can be re-generated using the script `generate_dataset.sh`.

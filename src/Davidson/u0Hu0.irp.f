@@ -86,7 +86,7 @@ subroutine H_u_0_nstates(v_0,u_0,H_jj,n,keys_tmp,Nint,N_st,sze_8)
   allocate(vt(N_st_8,n))
   Vt = 0.d0
   
-  !$OMP DO SCHEDULE(dynamic)
+  !$OMP DO SCHEDULE(dynamic) 
   do sh=1,shortcut(0,1)
     do sh2=sh,shortcut(0,1)
       exa = 0
@@ -149,6 +149,7 @@ subroutine H_u_0_nstates(v_0,u_0,H_jj,n,keys_tmp,Nint,N_st,sze_8)
   enddo
   !$OMP END DO NOWAIT
   
+  !$OMP BARRIER
   !$OMP CRITICAL
   do istate=1,N_st
     do i=n,1,-1
