@@ -32,39 +32,39 @@ To compile the code, you will need a configuration file that fits your
 architecture.  Examples are in the `config` directory. Copy a file which fits
 your architecture, modify it and use it to conifgure:
 
-``
+```bash
 cd config
 cp ifort.cfg calmip.cfg
 vim calmip.cfg             # Edit the config file
 cd ..
 ./configure --production config/calmip.cfg
-``
+```
 
 During the configuration, the missing dependencies are downloaded and compiled.
 Before compiling or running the program, it is necessary to have some environment
 variables set. To do this :
 
-``
+```bash
 source quantum_package.rc
-``
+```
 
 Now, install the modules necessary for the benchmark:
 
-``
+```bash
 cd $QP_ROOT
 qp_module.py install SCF Full_CI_ZMQ
-``
+```
 
 Compile the program
 
-``
+```bash
 cd $QP_ROOT
 ninja
-``
+```
 
 And run the benchmark:
 
-``
+```bash
 cd ${QP_ROOT}/CALMIP
 qp_run fci_zmq FeO4 > FeO4.out
-``
+```
