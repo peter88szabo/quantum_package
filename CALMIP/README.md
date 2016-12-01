@@ -26,7 +26,7 @@ The task server is written in OCaml. All the processes communicate with ZeroMQ
 Compiling the code
 ------------------
 
-Download the code here : https://codeload.github.com/scemama/quantum_package/zip/calmip`
+Download the code here : `https://codeload.github.com/scemama/quantum_package/zip/calmip`
 or using git:
 
 ```bash
