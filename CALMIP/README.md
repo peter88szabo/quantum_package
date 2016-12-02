@@ -72,14 +72,24 @@ ninja
 Benchmark
 ---------
 
+The goal of this benchmark is to find the architecture on which the benchmark will run the fastest.
+There is one part, after *PT2 Energy denominator* which does not do any flops, but which is intense
+in integer and bitwise operations. Then, the *Davidson Diagonalization* alternates between bitwise
+operations and calls to LAPACK. The important are the lines containing ``WALL TIME``, provided that
+the numerical result ``Energy of state 1`` is compatible with the reference (the 6 first digits
+should coincide).
+
 Go into the `CALMIP` directory and extract the data set :
 
 ```bash
 cd ${QP_ROOT}/CALMIP
-tar -zxvf FeO4.tar.gz
+tar -zxf FeO4.tar.gz
 ```
 
-Run the benchmark :
+Run the benchmark. All the threads are spawned by OpenMP, so ``OMP_NUM_THREADS`` controls the number
+of threads. In some sections of the program, there are N+1 threads : N worker threads and an additional
+thread to collect the results. The ``qp_run`` program handles the task queue and communicates with the
+Fortran program.
 
 ```
 qp_run fci_zmq FeO4 > FeO4.out
@@ -89,4 +99,5 @@ There is a reference file `FeO4.ref` in the directory to check that the results 
 The maximum required memory s 96 GB and the run requires roughly 40 minutes on 64 cores.
 
 
-If there is a problem with the dataset, it can be re-generated using the script `generate_dataset.sh`.
+If there is a technical  problem with the dataset, it can be re-generated using the script ``generate_dataset.sh``.
+
