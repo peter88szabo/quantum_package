@@ -12,7 +12,7 @@ program fci_zmq
   
   pt2 = 1.d0
   threshold_davidson_in = threshold_davidson
-  threshold_davidson = 1.d-5
+  threshold_davidson = 1.d-3
   SOFT_TOUCH threshold_davidson
   
   if (N_det > N_det_max) then

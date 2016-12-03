@@ -59,7 +59,7 @@ Now, install the modules necessary for the benchmark:
 
 ```bash
 cd $QP_ROOT
-qp_module.py install Hartree_Fock Full_CI_ZMQ MP2
+qp_module.py install Hartree_Fock Full_CI_ZMQ
 ```
 
 Compile the program
@@ -76,8 +76,8 @@ The goal of this benchmark is to find the architecture on which the benchmark wi
 There is one part, after *PT2 Energy denominator* which does not do any flops, but which is intense
 in integer and bitwise operations. Then, the *Davidson Diagonalization* alternates between bitwise
 operations and calls to LAPACK. The important are the lines containing ``WALL TIME``, provided that
-the numerical result ``Energy of state 1`` is compatible with the reference (the 6 first digits
-should coincide).
+the numerical result ``Energy of state 1`` is compatible with the reference (the 5 first digits 
+after the '.' should coincide).
 
 Go into the `CALMIP` directory and extract the data set :
 
@@ -96,8 +96,8 @@ qp_run fci_zmq FeO4 > FeO4.out
 ```
 
 There is a reference file `FeO4.ref` in the directory to check that the results are correct.
-The maximum required memory s 96 GB and the run requires roughly 40 minutes on 64 cores.
+The run requires roughly 20 minutes on 64 cores.
 
 
-If there is a technical  problem with the dataset, it can be re-generated using the script ``generate_dataset.sh``.
+If there is a technical problem with the dataset, it can be re-generated using the script ``generate_dataset.sh``.
 
