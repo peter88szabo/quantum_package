@@ -296,23 +296,3 @@ Davidson Diagonalization
 * Energy of state    1                              -1561.785594210147    
 * S^2 of state    1                                 0.1658770347534196E-01
 Wall time : 19.8048m
-
-Name                : test_mesca.sh
-User                : scemama
-Partition           : mesca
-NNodes              : 1
-Nodes               : eosmesca1
-State               : ,RUNNING
-Submit              : 2016-12-05T20:32:56
-Start               : 2016-12-05T20:33:11
-End                 : --
-Reserved walltime   : 10:00:00
-Used walltime       : 00:19:49
-Used CPU time       : --
-% User (Computation): --
-% System (I/O)      : --
-Mem reserved        : 1000000M/node
-Max Mem used        : 29.03G (eosmesca1)
-Max Disk Write      : 33.00M (eosmesca1)
-Max Disk Read       : 39.00M (eosmesca1)
-Comptabilise        : %0:%d:%d
