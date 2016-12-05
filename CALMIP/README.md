@@ -92,11 +92,11 @@ thread to collect the results. The ``qp_run`` program handles the task queue and
 Fortran program.
 
 ```
-qp_run fci_zmq FeO4 > FeO4.out
+qp_run fci_zmq_nosave FeO4 > FeO4.out
 ```
 
 There is a reference file `FeO4.ref` in the directory to check that the results are correct.
-The run requires roughly 20 minutes on 64 cores.
+The run requires roughly 30 minutes on 64 cores.
 
 
 If there is a technical problem with the dataset, it can be re-generated using the script ``generate_dataset.sh``.
