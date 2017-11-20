@@ -17,7 +17,7 @@ subroutine run_pt2_slave(thread,iproc,energy)
   integer(ZMQ_PTR), external     :: new_zmq_push_socket
   integer(ZMQ_PTR)               :: zmq_socket_push
 
-  type(selection_buffer) :: buf, buf2
+  type(selection_buffer) :: buf
   logical :: done
 
   double precision :: pt2(N_states)
@@ -25,7 +25,7 @@ subroutine run_pt2_slave(thread,iproc,energy)
   integer :: index
   integer :: Nindex
 
-  allocate(pt2_detail(N_states, N_det))
+  allocate(pt2_detail(N_states, N_det_generators))
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
   zmq_socket_push      = new_zmq_push_socket(thread)
   call connect_to_taskserver(zmq_to_qp_run_socket,worker_id,thread)
@@ -43,22 +43,16 @@ subroutine run_pt2_slave(thread,iproc,energy)
   do
     call get_task_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id(ctask), task)
 
-    done = task_id(ctask) == 0 
+    done = task_id(ctask) == 0
     if (done) then
       ctask = ctask - 1
     else
-      integer :: i_generator, i_i_generator, N, subset
+      integer :: i_generator, i_i_generator, subset
       read (task,*) subset, index
       
-      !!!!!
-      N=1
-      !!!!!
       if(buf%N == 0) then
         ! Only first time 
-        call create_selection_buffer(N, N*2, buf)
-        call create_selection_buffer(N, N*3, buf2)
-      else
-        if(N /= buf%N) stop "N changed... wtf man??"
+        call create_selection_buffer(1, 2, buf)
       end if
       do i_i_generator=1, Nindex
         i_generator = index
@@ -67,18 +61,13 @@ subroutine run_pt2_slave(thread,iproc,energy)
       enddo
     endif
 
-    if(done .or. ctask == size(task_id)) then
+    if(done .or. (ctask == size(task_id)) ) then
       if(buf%N == 0 .and. ctask > 0) stop "uninitialized selection_buffer"
       do i=1, ctask
          call task_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id(i))
       end do
       if(ctask > 0) then
         call push_pt2_results(zmq_socket_push, Nindex, index, pt2_detail, task_id(1), ctask)
-        do i=1,buf%cur
-          call add_to_selection_buffer(buf2, buf%det(1,1,i), buf%val(i))
-        enddo
-        call sort_selection_buffer(buf2)
-        buf%mini = buf2%mini
         pt2 = 0d0
         pt2_detail(:,:Nindex) = 0d0
         buf%cur = 0
@@ -92,6 +81,7 @@ subroutine run_pt2_slave(thread,iproc,energy)
   call disconnect_from_taskserver(zmq_to_qp_run_socket,zmq_socket_push,worker_id)
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call end_zmq_push_socket(zmq_socket_push,thread)
+  call delete_selection_buffer(buf)
 end subroutine
 
 
@@ -101,7 +91,7 @@ subroutine push_pt2_results(zmq_socket_push, N, index, pt2_detail, task_id, ntas
   implicit none
 
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_push
-  double precision, intent(in)   :: pt2_detail(N_states, N_det)
+  double precision, intent(in)   :: pt2_detail(N_states, N_det_generators)
   integer, intent(in) :: ntask, N, index, task_id(*)
   integer :: rc
 
@@ -123,8 +113,12 @@ subroutine push_pt2_results(zmq_socket_push, N, index, pt2_detail, task_id, ntas
   if(rc /= 4*ntask) stop "push"
 
 ! Activate is zmq_socket_push is a REQ
+IRP_IF ZMQ_PUSH
+IRP_ELSE
   character*(2) :: ok
   rc = f77_zmq_recv( zmq_socket_push, ok, 2, 0)
+IRP_ENDIF
+
 end subroutine
 
 
@@ -133,7 +127,7 @@ subroutine pull_pt2_results(zmq_socket_pull, N, index, pt2_detail, task_id, ntas
   use selection_types
   implicit none
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
-  double precision, intent(inout) :: pt2_detail(N_states, N_det)
+  double precision, intent(inout) :: pt2_detail(N_states, N_det_generators)
   integer, intent(out) :: index
   integer, intent(out) :: N, ntask, task_id(*)
   integer :: rc, rn, i
@@ -150,18 +144,22 @@ subroutine pull_pt2_results(zmq_socket_pull, N, index, pt2_detail, task_id, ntas
   rc = f77_zmq_recv( zmq_socket_pull, ntask, 4, 0)
   if(rc /= 4) stop "pull"
 
-  rc = f77_zmq_recv( zmq_socket_pull, task_id(1), ntask*4, 0)
+  rc = f77_zmq_recv( zmq_socket_pull, task_id, ntask*4, 0)
   if(rc /= 4*ntask) stop "pull"
 
 ! Activate is zmq_socket_pull is a REP
+IRP_IF ZMQ_PUSH
+IRP_ELSE
   rc = f77_zmq_send( zmq_socket_pull, 'ok', 2, 0)
+IRP_ENDIF
+
 end subroutine
  
  
-BEGIN_PROVIDER [ double precision, pt2_workload, (N_det) ]
+BEGIN_PROVIDER [ double precision, pt2_workload, (N_det_generators) ]
   integer :: i
-  do i=1,N_det
-    pt2_workload(:) = dfloat(N_det - i + 1)**2
+  do i=1,N_det_generators
+    pt2_workload(i) = dfloat(N_det_generators - i + 1)**2
   end do
   pt2_workload = pt2_workload / sum(pt2_workload)
 END_PROVIDER

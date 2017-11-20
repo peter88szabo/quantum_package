@@ -1,6 +1,6 @@
-open Core.Std;;
+open Core
 
-type t = float with sexp;;
+type t = float [@@deriving sexp]
 
 let of_float x = x
 let of_int   i = Float.of_int i
@@ -14,5 +14,4 @@ let to_string x =
     Printf.sprintf "+%f" x
   else
     Printf.sprintf "%f" x
-;;
 

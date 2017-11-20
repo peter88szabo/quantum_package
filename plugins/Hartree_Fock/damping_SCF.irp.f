@@ -12,13 +12,13 @@ subroutine damping_SCF
   character                      :: save_char
 
   allocate(                                                          &
-      D_alpha( ao_num_align, ao_num ),                               &
-      D_beta( ao_num_align, ao_num ),                                &
-      F_new( ao_num_align, ao_num ),                                 &
-      D_new_alpha( ao_num_align, ao_num ),                           &
-      D_new_beta( ao_num_align, ao_num ),                            &
-      delta_alpha( ao_num_align, ao_num ),                           &
-      delta_beta( ao_num_align, ao_num ))
+      D_alpha( ao_num, ao_num ),                               &
+      D_beta( ao_num, ao_num ),                                &
+      F_new( ao_num, ao_num ),                                 &
+      D_new_alpha( ao_num, ao_num ),                           &
+      D_new_beta( ao_num, ao_num ),                            &
+      delta_alpha( ao_num, ao_num ),                           &
+      delta_beta( ao_num, ao_num ))
   
   do j=1,ao_num
     do i=1,ao_num
@@ -119,7 +119,7 @@ subroutine damping_SCF
   write(output_hartree_fock,*)
   
   if(.not.no_oa_or_av_opt)then
-   call mo_as_eigvectors_of_mo_matrix(Fock_matrix_mo,size(Fock_matrix_mo,1),size(Fock_matrix_mo,2),mo_label,1)
+   call mo_as_eigvectors_of_mo_matrix(Fock_matrix_mo,size(Fock_matrix_mo,1),size(Fock_matrix_mo,2),mo_label,1,.true.)
   endif
 
   call write_double(output_hartree_fock, E_min, 'Hartree-Fock energy')

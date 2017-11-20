@@ -14,7 +14,7 @@ function run_HF() {
   test_exe SCF || skip
   qp_edit -c $1
   ezfio set_file $1
-  ezfio set hartree_fock thresh_scf 1.e-11
+  ezfio set hartree_fock thresh_scf 2.e-8
   qp_run SCF $1
   energy="$(ezfio get hartree_fock energy)"
   eq $energy $2 $thresh
@@ -26,7 +26,7 @@ function run_FCI_ZMQ() {
   test_exe fci_zmq|| skip
   qp_edit -c $1
   ezfio set_file $1
-  ezfio set perturbation do_pt2_end True
+  ezfio set perturbation do_pt2 True
   ezfio set determinants n_det_max $2
   ezfio set davidson threshold_davidson 1.e-10
 

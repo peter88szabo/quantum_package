@@ -4,7 +4,7 @@ type t =
   | Active   of Qptypes.MO_number.t list
   | Virtual  of Qptypes.MO_number.t list
   | Deleted  of Qptypes.MO_number.t list
-with sexp
+[@@deriving sexp]
 
 
 (** Create different excitation classes *)
@@ -19,3 +19,6 @@ val to_bitlist      : Qptypes.N_int_number.t -> t -> Bitlist.t
 
 (** Convert to string for printing *)
 val to_string : t -> string
+
+val of_string : string -> t
+

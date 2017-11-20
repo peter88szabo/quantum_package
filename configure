@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """configure
 
-Usage: configure <config_file> (--production | --development)
+Usage: configure <config_file> 
 
 
 Options:
@@ -10,18 +10,10 @@ Options:
     config_file   A config file with all the information for compiling.
                   Example config_files are given in config/
 
-   --production   You can only compile **all** the modules with this flag,
-                  but it will compile lighting fast.
-
-   --development  this will create a build.ninja for each directory which 
-                  contains a binary. In a second step you may compile them
-                  individually if you like.
-
-
 Examples:
 
-    ./configure config/gfortran.cfg --production
-    ./configure config/ifort.cfg    --development
+    ./configure config/gfortran.cfg 
+    ./configure config/ifort.cfg    
 
 
 """
@@ -34,10 +26,7 @@ import sys
 
 from os.path import join
 
-if not any(i in ["--production", "--development"] for i in sys.argv):
-    sys.argv += ["--development"]
-
-if len(sys.argv) != 3:
+if len(sys.argv) != 2:
     print __doc__
     sys.exit()
 
@@ -54,6 +43,7 @@ except KeyError:
 
 QP_ROOT_BIN = join(QP_ROOT, "bin")
 QP_ROOT_LIB = join(QP_ROOT, "lib")
+QP_ROOT_LIB64 = join(QP_ROOT, "lib64")
 QP_ROOT_INSTALL = join(QP_ROOT, "install")
 
 os.environ["PATH"] = os.environ["PATH"] + ":" + QP_ROOT_BIN
@@ -76,6 +66,7 @@ d_dependency = {
     "python": [],
     "ninja": ["g++", "python"],
     "make": [],
+    "gpi2": ["g++", "make"],
     "p_graphviz": ["python"],
     "bats": []
 }
@@ -88,7 +79,7 @@ path_github = {"head": "http://github.com", "tail": "archive/master.tar.gz"}
 
 ocaml = Info(
     url='http://raw.github.com/ocaml/opam/master/shell/opam_installer.sh',
-    description=' Ocaml, Opam and the Core library (it will take some time roughly 20min)',
+    description=' OCaml, Opam and the Core library (it will take some time roughly 20min)',
     default_path=join(QP_ROOT_BIN, "opam"))
 
 m4 = Info(
@@ -102,7 +93,7 @@ curl = Info(
     default_path=join(QP_ROOT_BIN, "curl"))
 
 zlib = Info(
-    url='http://www.zlib.net/fossils/zlib-1.2.10.tar.gz',
+    url='http://www.zlib.net/zlib-1.2.11.tar.gz',
     description=' zlib',
     default_path=join(QP_ROOT_LIB, "libz.a"))
 
@@ -151,6 +142,11 @@ f77zmq = Info(
     description=' F77-ZeroMQ',
     default_path=join(QP_ROOT_LIB, "libf77zmq.a") )
 
+gpi2 = Info( 
+    url='https://github.com/cc-hpc-itwm/GPI-2/archive/v1.3.0.tar.gz',
+    description=' GPI-2',
+    default_path=join(QP_ROOT_LIB64, "libGPI2.a") )
+
 p_graphviz = Info(
     url='https://github.com/xflr6/graphviz/archive/master.tar.gz',
     description=' Python library for graphviz',
@@ -165,7 +161,7 @@ d_info = dict()
 
 for m in ["ocaml", "m4", "curl", "zlib", "patch", "irpf90", "docopt",
           "resultsFile", "ninja", "emsl", "ezfio", "p_graphviz",
-          "zeromq", "f77zmq","bats"]: 
+          "zeromq", "f77zmq", "bats", "gpi2"]: 
     exec ("d_info['{0}']={0}".format(m))
 
 
@@ -492,8 +488,8 @@ def create_ninja_and_rc(l_installed):
         'export NINJA={0}'.format(path_ninja.replace(QP_ROOT,"${QP_ROOT}")),
         'export PYTHONPATH="${QP_EZFIO}/Python":"${QP_PYTHON}":"${PYTHONPATH}"',
         'export PATH="${QP_PYTHON}":"${QP_ROOT}"/bin:"${QP_ROOT}"/ocaml:"${PATH}"',
-        'export LD_LIBRARY_PATH="${QP_ROOT}"/lib:"${LD_LIBRARY_PATH}"',
-        'export LIBRARY_PATH="${QP_ROOT}"/lib:"${LIBRARY_PATH}"',
+        'export LD_LIBRARY_PATH="${QP_ROOT}"/lib:"${QP_ROOT}"/lib64:"${LD_LIBRARY_PATH}"',
+        'export LIBRARY_PATH="${QP_ROOT}"/lib:"${QP_ROOT}"/lib64:"${LIBRARY_PATH}"',
         'export C_INCLUDE_PATH="${C_INCLUDE_PATH}":"${QP_ROOT}"/include',
         '',
         'source ${QP_ROOT}/install/EZFIO/Bash/ezfio.sh',
@@ -528,7 +524,7 @@ def create_ninja_and_rc(l_installed):
     qp_create_ninja = os.path.join(QP_ROOT, "scripts", "compilation",
                                    "qp_create_ninja.py")
 
-    l = [qp_create_ninja, "create"] + sys.argv[1:]
+    l = [qp_create_ninja, "create", "--development"] + sys.argv[1:]
 
     try:
         with open('/dev/null', 'w') as dnull:

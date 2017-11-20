@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Welcom the ei_handler.
+Welcome to the ei_handler.
 We will create all the ezfio related stuff from a EZFIO.cfg file.
 
 Usage:
@@ -106,7 +106,7 @@ def is_bool(str_):
 def get_type_dict():
     """
     This function makes the correspondance between the type of value read in
-    ezfio.cfg into the f90 and Ocaml Type
+    ezfio.cfg into the f90 and OCaml Type
     return fancy_type[fancy_type] = namedtuple('Type', 'ocaml fortran')
     For example fancy_type['Ndet'].fortran = interger
                                   .ocaml   = int
@@ -182,6 +182,8 @@ def get_type_dict():
         fancy_type[str_fancy_type] = Type(str_fancy_type,
                                           str_ocaml_type,
                                           str_fortran_type)
+
+    fancy_type["MO_class"] = Type("MO_class", "MO_class", "character*(32)")
 
     # ~#~#~#~#~#~#~#~ #
     # F i n a l i z e #
@@ -541,7 +543,7 @@ def create_ocaml_input(dict_ezfio_cfg, module_lower):
 
     template += ["open Qptypes;;",
                  "open Qputils;;",
-                 "open Core.Std;;",
+                 "open Core;;",
                  "",
                  "module {0} : sig".format(module_lower.capitalize())]
 
@@ -615,7 +617,7 @@ def save_ocaml_input(module_lower, str_ocaml_input):
 
 def get_l_module_with_auto_generate_ocaml_lower():
     """
-    Get all modules which have EZFIO.cfg with Ocaml data
+    Get all modules which have EZFIO.cfg with OCaml data
         (NB `search` in all the lines and `match` only in one)
     """
 

@@ -1,13 +1,13 @@
-open Core.Std
+open Core
 open Qptypes
 
 
-module Primitive_local : sig
+module GaussianPrimitive_local : sig
 
   type t = { 
     expo    : AO_expo.t ;
     r_power : R_power.t ;
-  } with sexp
+  } [@@deriving sexp]
 
   val of_expo_r_power : AO_expo.t -> R_power.t -> t
   val to_string : t -> string
@@ -17,7 +17,7 @@ end = struct
   type t = { 
     expo    : AO_expo.t ;
     r_power : R_power.t ;
-  } with sexp
+  } [@@deriving sexp]
 
   let of_expo_r_power dz n = 
      { expo = dz ; r_power = n }
@@ -29,13 +29,13 @@ end = struct
 end
 
 
-module Primitive_non_local : sig
+module GaussianPrimitive_non_local : sig
 
   type t = { 
     expo    : AO_expo.t ;
     r_power : R_power.t ;
     proj    : Positive_int.t
-  } with sexp
+  } [@@deriving sexp]
 
   val of_proj_expo_r_power : Positive_int.t -> AO_expo.t -> R_power.t -> t
   val to_string : t -> string
@@ -46,7 +46,7 @@ end = struct
     expo    : AO_expo.t ;
     r_power : R_power.t ;
     proj    : Positive_int.t
-  } with sexp
+  } [@@deriving sexp]
 
   let of_proj_expo_r_power p dz n = 
      { expo = dz ; r_power = n ; proj = p }
@@ -64,9 +64,9 @@ end
 type t = {
   element   : Element.t ;
   n_elec    : Positive_int.t ;
-  local     : (Primitive_local.t * AO_coef.t ) list ;
-  non_local : (Primitive_non_local.t * AO_coef.t ) list 
-} with sexp
+  local     : (GaussianPrimitive_local.t * AO_coef.t ) list ;
+  non_local : (GaussianPrimitive_non_local.t * AO_coef.t ) list 
+} [@@deriving sexp]
 
 let empty e =
   { element   = e;
@@ -83,8 +83,8 @@ let to_string_local = function
   ( Printf.sprintf "%20s %8s %20s" "Coeff." "r^n" "Exp." ) ::
   ( List.map t ~f:(fun (l,c) -> Printf.sprintf "%20f %8d %20f"
       (AO_coef.to_float c) 
-      (R_power.to_int   l.Primitive_local.r_power)
-      (AO_expo.to_float l.Primitive_local.expo)
+      (R_power.to_int   l.GaussianPrimitive_local.r_power)
+      (AO_expo.to_float l.GaussianPrimitive_local.expo)
   ) )
   |> String.concat ~sep:"\n" 
 
@@ -97,12 +97,12 @@ let to_string_non_local = function
   ( Printf.sprintf "%20s %8s %20s %8s" "Coeff." "r^n" "Exp." "Proj") ::
   ( List.map t ~f:(fun (l,c) ->
       let p = 
-        Positive_int.to_int l.Primitive_non_local.proj
+        Positive_int.to_int l.GaussianPrimitive_non_local.proj
       in
       Printf.sprintf "%20f %8d %20f   |%d><%d|"
       (AO_coef.to_float c) 
-      (R_power.to_int   l.Primitive_non_local.r_power)
-      (AO_expo.to_float l.Primitive_non_local.expo)
+      (R_power.to_int   l.GaussianPrimitive_non_local.r_power)
+      (AO_expo.to_float l.GaussianPrimitive_non_local.expo)
       p p
   ) )
   |> String.concat ~sep:"\n" 
@@ -223,7 +223,7 @@ let read_element in_channel element =
       let decode_local (pseudo,data) = 
         let decode_local_n n rest =
           let result, rest =
-            loop Primitive_local.of_expo_r_power [] (Positive_int.to_int n,rest)
+            loop GaussianPrimitive_local.of_expo_r_power [] (Positive_int.to_int n,rest)
           in
           { pseudo with local = result }, rest
         in
@@ -241,7 +241,7 @@ let read_element in_channel element =
       let decode_non_local (pseudo,data) = 
         let decode_non_local_n proj n (pseudo,data) =
           let result, rest = 
-            loop (Primitive_non_local.of_proj_expo_r_power proj)
+            loop (GaussianPrimitive_non_local.of_proj_expo_r_power proj)
               [] (Positive_int.to_int n, data)
           in
           { pseudo with non_local = pseudo.non_local @ result }, rest

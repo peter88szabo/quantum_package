@@ -7,35 +7,26 @@ program davidson_slave
   integer(ZMQ_PTR) :: zmq_to_qp_run_socket
   double precision :: energy(N_states_diag)
   character*(64) :: state
-  logical :: force_update
   
   call provide_everything
   call switch_qp_run_to_master
+  call omp_set_nested(.True.)
   
   zmq_context = f77_zmq_ctx_new ()
   zmq_state = 'davidson'
   state = 'Waiting'
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
-  force_update = .True.
   do
     call wait_for_state(zmq_state,state)
     if(trim(state) /= "davidson") exit
-    call davidson_miniserver_get(force_update)
-    force_update = .False.
-    
     integer :: rc, i
- 
     print *,  'Davidson slave running'
- 
-    !$OMP PARALLEL PRIVATE(i)
-    i = omp_get_thread_num()
     call davidson_slave_tcp(i)
-    !$OMP END PARALLEL
   end do
 end
 
 subroutine provide_everything
-  PROVIDE mo_bielec_integrals_in_map psi_det_sorted_bit N_states_diag zmq_context
+  PROVIDE mo_bielec_integrals_in_map psi_det_sorted_bit N_states_diag zmq_context ref_bitmask_energy
 end subroutine
 

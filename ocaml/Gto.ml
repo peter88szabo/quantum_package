@@ -1,5 +1,5 @@
-open Core.Std
 open Qptypes
+open Sexplib.Std
 
 exception GTO_Read_Failure of string
 exception End_Of_Basis
@@ -10,17 +10,17 @@ type fmt =
 
 type t =
 { sym  : Symmetry.t ;
-  lc   : ((Primitive.t * AO_coef.t) list)
-} with sexp
+  lc   : ((GaussianPrimitive.t * AO_coef.t) list)
+} [@@deriving sexp]
 
 
 let of_prim_coef_list pc =
-  let (p,c) = List.hd_exn pc in
-  let sym = p.Primitive.sym in
+  let (p,c) = List.hd pc in
+  let sym = p.GaussianPrimitive.sym in
   let rec check = function
   | [] -> `OK
   | (p,c)::tl -> 
-      if p.Primitive.sym <> sym then
+      if p.GaussianPrimitive.sym <> sym then
         `Failed
       else
         check tl
@@ -37,12 +37,12 @@ let of_prim_coef_list pc =
 let read_one in_channel =
   (* Fetch number of lines to read on first line *)
   let buffer = input_line in_channel in
-  if ( (String.strip buffer) = "" ) then
+  if ( (String_ext.strip buffer) = "" ) then
      raise End_Of_Basis;
   let sym_str = String.sub buffer 0 2 in
   let   n_str = String.sub buffer 2 ((String.length buffer)-2) in
-  let sym = Symmetry.of_string (String.strip sym_str) in
-  let n = Int.of_string (String.strip n_str) in
+  let sym = Symmetry.of_string (String_ext.strip sym_str) in
+  let n = int_of_string (String_ext.strip n_str) in
   (* Read all the primitives *)
   let rec read_lines result = function
   | 0 -> result
@@ -50,18 +50,19 @@ let read_one in_channel =
     begin
       let line_buffer = input_line in_channel in
       let buffer = line_buffer 
-      |> String.split ~on:' ' 
-      |> List.filter ~f:(fun x -> x <> "")
+      |> String_ext.split ~on:' ' 
+      |> List.filter (fun x -> x <> "")
       in
       match buffer with
       | [ j ; expo ; coef ] ->
         begin
-          let coef = String.tr ~target:'D' ~replacement:'e' coef
+          let coef =
+            Str.global_replace (Str.regexp "D") "e" coef
           in
           let p =
-            Primitive.of_sym_expo sym 
-              (AO_expo.of_float (Float.of_string expo) )
-          and c = AO_coef.of_float (Float.of_string coef) in
+            GaussianPrimitive.of_sym_expo sym 
+              (AO_expo.of_float (float_of_string expo) )
+          and c = AO_coef.of_float (float_of_string coef) in
           read_lines ( (p,c)::result) (i-1)
         end
       | _ -> raise (GTO_Read_Failure line_buffer)
@@ -80,7 +81,7 @@ let to_string_gamess { sym = sym ; lc = lc } =
   let rec do_work accu i = function
   | [] -> List.rev accu
   | (p,c)::tail -> 
-    let p = AO_expo.to_float p.Primitive.expo
+    let p = AO_expo.to_float p.GaussianPrimitive.expo
     and c = AO_coef.to_float c
     in
     let result = 
@@ -89,7 +90,7 @@ let to_string_gamess { sym = sym ; lc = lc } =
     do_work (result::accu) (i+1) tail
   in
   (do_work [result] 1 lc)
-  |> String.concat ~sep:"\n"
+  |> String.concat "\n"
 
 
 (** Write the GTO in Gaussian format *)
@@ -100,7 +101,7 @@ let to_string_gaussian { sym = sym ; lc = lc } =
   let rec do_work accu i = function
   | [] -> List.rev accu
   | (p,c)::tail -> 
-    let p = AO_expo.to_float p.Primitive.expo
+    let p = AO_expo.to_float p.GaussianPrimitive.expo
     and c = AO_coef.to_float c
     in
     let result = 
@@ -109,7 +110,7 @@ let to_string_gaussian { sym = sym ; lc = lc } =
     do_work (result::accu) (i+1) tail
   in
   (do_work [result] 1 lc)
-  |> String.concat ~sep:"\n"
+  |> String.concat "\n"
 
 
 (** Transform the gto to a string *)

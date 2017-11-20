@@ -14,11 +14,22 @@ subroutine run
   integer                        :: class(0:mo_tot_num,5)
   double precision               :: occupation(mo_tot_num)
 
+  write(*,'(A)')  'Energy of 1st determinant'
+  write(*,'(A)')  '========================='
+  write(*,'(A)')  ''
+  write(*,*) 'Total', ref_bitmask_energy + nuclear_repulsion
+  write(*,*) 'Mono-electronic', mono_elec_ref_bitmask_energy
+  write(*,*) 'Kinetic', kinetic_ref_bitmask_energy
+  write(*,*) 'Electron-nucleus', nucl_elec_ref_bitmask_energy
+  write(*,*) 'Two-electron', bi_elec_ref_bitmask_energy
+  write(*,'(A)')  ''
+  write(*,'(A)')  ''
+
   write(*,'(A)')  'MO Occupation'
   write(*,'(A)')  '============='
   write(*,'(A)')  ''
   do istate=1,N_states
-    call get_occupation_from_dets(occupation,1)
+    call get_occupation_from_dets(occupation,istate)
     write(*,'(A)')  ''
     write(*,'(A,I3)'),  'State ', istate
     write(*,'(A)')  '---------------'
@@ -30,13 +41,13 @@ subroutine run
       if (occupation(i) > 1.999d0) then
         class(0,1) += 1
         class( class(0,1), 1) = i
-      else if (occupation(i) > 1.95d0) then
+      else if (occupation(i) > 1.97d0) then
         class(0,2) += 1
         class( class(0,2), 2) = i
       else if (occupation(i) < 0.001d0) then
         class(0,5) += 1
         class( class(0,5), 5) = i
-      else if (occupation(i) < 0.01d0) then
+      else if (occupation(i) < 0.03d0) then
         class(0,4) += 1
         class( class(0,4), 4) = i
       else 

@@ -76,7 +76,8 @@ subroutine resize_H_apply_buffer(new_size,iproc)
   allocate ( buffer_det(N_int,2,new_size),                           &
       buffer_coef(new_size,N_states),                                &
       buffer_e2(new_size,N_states) )
-  
+  buffer_coef = 0.d0 
+  buffer_e2 = 0.d0 
   do i=1,min(new_size,H_apply_buffer(iproc)%N_det)
     do k=1,N_int
       buffer_det(k,1,i) = H_apply_buffer(iproc)%det(k,1,i)
@@ -191,8 +192,8 @@ subroutine copy_H_apply_buffer_to_wf
   call normalize(psi_coef,N_det)
   SOFT_TOUCH N_det psi_det psi_coef
   
-  logical :: found_duplicates
-  !call remove_duplicates_in_psi_det(found_duplicates)
+!  logical :: found_duplicates
+!  call remove_duplicates_in_psi_det(found_duplicates)
 end
 
 subroutine remove_duplicates_in_psi_det(found_duplicates)
@@ -362,12 +363,16 @@ subroutine push_pt2(zmq_socket_push,pt2,norm_pert,H_pert_diag,i_generator,N_st,t
   endif
 
 ! Activate if zmq_socket_push is a REQ
+IRP_IF ZMQ_PUSH
+IRP_ELSE
   integer :: idummy
   rc = f77_zmq_recv( zmq_socket_push, idummy, 4, 0)
   if (rc /= 4) then
     print *, irp_here, 'f77_zmq_send( zmq_socket_push, idummy, 4, 0)'
     stop 'error'
   endif
+IRP_ENDIF
+
 end
 
 subroutine pull_pt2(zmq_socket_pull,pt2,norm_pert,H_pert_diag,i_generator,N_st,n,task_id)
@@ -433,11 +438,14 @@ subroutine pull_pt2(zmq_socket_pull,pt2,norm_pert,H_pert_diag,i_generator,N_st,n
   endif
 
 ! Activate if zmq_socket_pull is a REP
+IRP_IF ZMQ_PUSH
+IRP_ELSE
   rc = f77_zmq_send( zmq_socket_pull, 0, 4, 0)
   if (rc /= 4) then
     print *, irp_here,  'f77_zmq_send( zmq_socket_pull, 0, 4, 0)'
     stop 'error'
   endif
+IRP_ENDIF
 
 end
 

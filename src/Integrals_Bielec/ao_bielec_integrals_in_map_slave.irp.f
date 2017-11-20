@@ -56,13 +56,15 @@ subroutine push_integrals(zmq_socket_push, n_integrals, buffer_i, buffer_value, 
     stop 'error'
   endif
 
-! Activate is zmq_socket_push is a REQ
+IRP_IF ZMQ_PUSH
+IRP_ELSE
   integer :: idummy
   rc = f77_zmq_recv( zmq_socket_push, idummy, 4, 0)
   if (rc /= 4) then
     print *, irp_here, ': f77_zmq_send( zmq_socket_push, idummy, 4, 0)'
     stop 'error'
   endif
+IRP_ENDIF
 end
 
 
@@ -140,8 +142,8 @@ subroutine ao_bielec_integrals_in_map_collector
   integer(ZMQ_PTR), external     :: new_zmq_pull_socket
   integer(ZMQ_PTR)               :: zmq_socket_pull
   
-  integer*8                      :: control, accu
-  integer                        :: task_id, more, sze
+  integer*8                      :: control, accu, sze
+  integer                        :: task_id, more
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
   zmq_socket_pull = new_zmq_pull_socket()
@@ -186,12 +188,14 @@ subroutine ao_bielec_integrals_in_map_collector
 
       rc = f77_zmq_recv( zmq_socket_pull, task_id, 4, 0)
 
-! Activate if zmq_socket_pull is a REP
+IRP_IF ZMQ_PUSH
+IRP_ELSE
       rc = f77_zmq_send( zmq_socket_pull, 0, 4, 0)
       if (rc /= 4) then
         print *,  irp_here, ' : f77_zmq_send (zmq_socket_pull,...'
         stop 'error'
       endif
+IRP_ENDIF
 
       
       call insert_into_ao_integrals_map(n_integrals,buffer_i,buffer_value)

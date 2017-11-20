@@ -1,30 +1,60 @@
 subroutine get_excitation_degree(key1,key2,degree,Nint)
   use bitmasks
+  include 'Utils/constants.include.F'
   implicit none
   BEGIN_DOC
   ! Returns the excitation degree between two determinants
   END_DOC
   integer, intent(in)            :: Nint
-  integer(bit_kind), intent(in)  :: key1(Nint,2)
-  integer(bit_kind), intent(in)  :: key2(Nint,2)
+  integer(bit_kind), intent(in)  :: key1(Nint*2)
+  integer(bit_kind), intent(in)  :: key2(Nint*2)
   integer, intent(out)           :: degree
   
+  integer(bit_kind)              :: xorvec(2*N_int_max)
+  !DIR$ ATTRIBUTES ALIGN : $IRP_ALIGN :: xorvec
   integer                        :: l
   
   ASSERT (Nint > 0)
   
-  degree = popcnt(xor( key1(1,1), key2(1,1))) +                      &
-      popcnt(xor( key1(1,2), key2(1,2)))
-  !DIR$ NOUNROLL
-  do l=2,Nint
-    degree = degree+ popcnt(xor( key1(l,1), key2(l,1))) +            &
-        popcnt(xor( key1(l,2), key2(l,2)))
-  enddo
-  ASSERT (degree >= 0)
+  select case (Nint)
+
+    case (1)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      degree = sum(popcnt(xorvec(1:2)))
+
+    case (2)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      xorvec(3) = xor( key1(3), key2(3))
+      xorvec(4) = xor( key1(4), key2(4))
+      degree = sum(popcnt(xorvec(1:4)))
+
+    case (3)
+      do l=1,6
+        xorvec(l) = xor( key1(l), key2(l))
+      enddo
+      degree = sum(popcnt(xorvec(1:6)))
+
+    case (4)
+      do l=1,8
+        xorvec(l) = xor( key1(l), key2(l))
+      enddo
+      degree = sum(popcnt(xorvec(1:8)))
+
+    case default
+      integer :: lmax
+      lmax = ishft(Nint,1)
+      do l=1,lmax
+        xorvec(l) = xor( key1(l), key2(l))
+      enddo
+      degree = sum(popcnt(xorvec(1:lmax)))
+  
+  end select
+
   degree = ishft(degree,-1)
   
 end
-
 
 
 subroutine get_excitation(det1,det2,exc,degree,phase,Nint)
@@ -85,72 +115,6 @@ subroutine decode_exc(exc,degree,h1,p1,h2,p2,s1,s2)
   END_DOC
   integer, intent(in)            :: exc(0:2,2,2),degree
   integer, intent(out)           :: h1,h2,p1,p2,s1,s2
-  ASSERT (degree > 0)
-  ASSERT (degree < 3)
-  
-  select case(degree)
-    case(2)
-      if (exc(0,1,1) == 2) then
-        h1 = exc(1,1,1)
-        h2 = exc(2,1,1)
-        p1 = exc(1,2,1)
-        p2 = exc(2,2,1)
-        s1 = 1
-        s2 = 1
-      else if (exc(0,1,2) == 2) then
-        h1 = exc(1,1,2)
-        h2 = exc(2,1,2)
-        p1 = exc(1,2,2)
-        p2 = exc(2,2,2)
-        s1 = 2
-        s2 = 2
-      else
-        h1 = exc(1,1,1)
-        h2 = exc(1,1,2)
-        p1 = exc(1,2,1)
-        p2 = exc(1,2,2)
-        s1 = 1
-        s2 = 2
-      endif
-    case(1)
-      if (exc(0,1,1) == 1) then
-        h1 = exc(1,1,1)
-        h2 = 0
-        p1 = exc(1,2,1)
-        p2 = 0
-        s1 = 1
-        s2 = 0
-      else
-        h1 = exc(1,1,2)
-        h2 = 0
-        p1 = exc(1,2,2)
-        p2 = 0
-        s1 = 2
-        s2 = 0
-      endif
-    case(0)
-      h1 = 0
-      p1 = 0
-      h2 = 0
-      p2 = 0
-      s1 = 0
-      s2 = 0
-  end select
-end
-
-
-subroutine decode_exc_int2(exc,degree,h1,p1,h2,p2,s1,s2)
-  use bitmasks
-  implicit none
-  BEGIN_DOC
-  ! Decodes the exc arrays returned by get_excitation.
-  ! h1,h2 : Holes
-  ! p1,p2 : Particles
-  ! s1,s2 : Spins (1:alpha, 2:beta)
-  ! degree : Degree of excitation
-  END_DOC
-  integer, intent(in)            :: exc(0:2,2,2),degree
-  integer*2, intent(out)           :: h1,h2,p1,p2,s1,s2
   ASSERT (degree > 0)
   ASSERT (degree < 3)
   
@@ -270,57 +234,66 @@ subroutine get_double_excitation(det1,det2,exc,phase,Nint)
         cycle
         
       case(1)
+
+        high = max(exc(1,1,ispin), exc(1,2,ispin))-1
         low  = min(exc(1,1,ispin), exc(1,2,ispin))
-        high = max(exc(1,1,ispin), exc(1,2,ispin))
-        
-        ASSERT (low > 0)
-        j = ishft(low-1,-bit_kind_shift)+1   ! Find integer in array(Nint)
-        n = iand(low-1,bit_kind_size-1)+1        ! mod(low,bit_kind_size)
+
+        ASSERT (low >= 0)
         ASSERT (high > 0)
-        k = ishft(high-1,-bit_kind_shift)+1
-        m = iand(high-1,bit_kind_size-1)+1
+
+        k = ishft(high,-bit_kind_shift)+1
+        j = ishft(low,-bit_kind_shift)+1
+        m = iand(high,bit_kind_size-1)
+        n = iand(low,bit_kind_size-1)
         
         if (j==k) then
-          nperm = nperm + popcnt(iand(det1(j,ispin),                 &
-              iand( ibset(0_bit_kind,m-1)-1_bit_kind,                &
-              ibclr(-1_bit_kind,n)+1_bit_kind ) ))
+          nperm = nperm + popcnt(iand(det1(j,ispin),           &
+              iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                    not(ishft(1_bit_kind,n))+1_bit_kind)) )
         else
-          nperm = nperm + popcnt(iand(det1(k,ispin),                 &
-              ibset(0_bit_kind,m-1)-1_bit_kind)) 
-          if (n < bit_kind_size) then
-              nperm = nperm + popcnt(iand(det1(j,ispin), ibclr(-1_bit_kind,n) +1_bit_kind))
-          endif
+          nperm = nperm + popcnt(                                    &
+               iand(det1(j,ispin),                                   &
+                    iand(not(0_bit_kind),                            &
+                         (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+               + popcnt(iand(det1(k,ispin),                          &
+                             (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+
           do i=j+1,k-1
             nperm = nperm + popcnt(det1(i,ispin))
           end do
+
         endif
         
       case (2)
         
-        do i=1,2
-          low  = min(exc(i,1,ispin), exc(i,2,ispin))
-          high = max(exc(i,1,ispin), exc(i,2,ispin))
-          
+        do l=1,2
+          high = max(exc(l,1,ispin), exc(l,2,ispin))-1
+          low  = min(exc(l,1,ispin), exc(l,2,ispin))
+
           ASSERT (low > 0)
-          j = ishft(low-1,-bit_kind_shift)+1   ! Find integer in array(Nint)
-          n = iand(low-1,bit_kind_size-1)+1        ! mod(low,bit_kind_size)
           ASSERT (high > 0)
-          k = ishft(high-1,-bit_kind_shift)+1
-          m = iand(high-1,bit_kind_size-1)+1
+
+          k = ishft(high,-bit_kind_shift)+1
+          j = ishft(low,-bit_kind_shift)+1
+          m = iand(high,bit_kind_size-1)
+          n = iand(low,bit_kind_size-1)
           
           if (j==k) then
-            nperm = nperm + popcnt(iand(det1(j,ispin),               &
-                iand( ibset(0_bit_kind,m-1)-1_bit_kind,              &
-                ibclr(-1_bit_kind,n)+1_bit_kind ) ))
+            nperm = nperm + popcnt(iand(det1(j,ispin),           &
+                iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                    not(ishft(1_bit_kind,n))+1_bit_kind)) )
           else
-            nperm = nperm + popcnt(iand(det1(k,ispin),               &
-                ibset(0_bit_kind,m-1)-1_bit_kind)) 
-            if (n < bit_kind_size) then
-               nperm = nperm + popcnt(iand(det1(j,ispin), ibclr(-1_bit_kind,n) +1_bit_kind))
-            endif
-            do l=j+1,k-1
-              nperm = nperm + popcnt(det1(l,ispin))
+            nperm = nperm + popcnt(                                    &
+                 iand(det1(j,ispin),                                   &
+                      iand(not(0_bit_kind),                            &
+                           (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+                 + popcnt(iand(det1(k,ispin),                          &
+                               (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+    
+            do i=j+1,k-1
+              nperm = nperm + popcnt(det1(i,ispin))
             end do
+    
           endif
           
         enddo
@@ -329,7 +302,7 @@ subroutine get_double_excitation(det1,det2,exc,phase,Nint)
         b = max(exc(1,1,ispin), exc(1,2,ispin))
         c = min(exc(2,1,ispin), exc(2,2,ispin))
         d = max(exc(2,1,ispin), exc(2,2,ispin))
-        if (c>a .and. c<b .and. d>b) then
+        if ((a<c) .and. (c<b) .and. (b<d)) then
           nperm = nperm + 1
         endif
         exit
@@ -390,33 +363,42 @@ subroutine get_mono_excitation(det1,det2,exc,phase,Nint)
       if ( iand(exc(0,1,ispin),exc(0,2,ispin)) /= 1) then  ! exc(0,1,ispin)/=1 and exc(0,2,ispin) /= 1
         cycle
       endif
-      
-      low = min(exc(1,1,ispin),exc(1,2,ispin))
-      high = max(exc(1,1,ispin),exc(1,2,ispin))
-      
-      ASSERT (low > 0)
-      j = ishft(low-1,-bit_kind_shift)+1   ! Find integer in array(Nint)
-      n = iand(low-1,bit_kind_size-1)+1      ! mod(low,bit_kind_size)
+
+      high = max(exc(1,1,ispin), exc(1,2,ispin))-1
+      low  = min(exc(1,1,ispin), exc(1,2,ispin))
+
+      ASSERT (low >= 0)
       ASSERT (high > 0)
-      k = ishft(high-1,-bit_kind_shift)+1
-      m = iand(high-1,bit_kind_size-1)+1
+
+      k = ishft(high,-bit_kind_shift)+1
+      j = ishft(low,-bit_kind_shift)+1
+      m = iand(high,bit_kind_size-1)
+      n = iand(low,bit_kind_size-1)
+      
       if (j==k) then
-        nperm = popcnt(iand(det1(j,ispin),                           &
-            iand(ibset(0_bit_kind,m-1)-1_bit_kind,ibclr(-1_bit_kind,n)+1_bit_kind)))
+        nperm = nperm + popcnt(iand(det1(j,ispin),           &
+            iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                  not(ishft(1_bit_kind,n))+1_bit_kind)) )
       else
-        nperm = nperm + popcnt(iand(det1(k,ispin),ibset(0_bit_kind,m-1)-1_bit_kind))
-        if (n < bit_kind_size) then
-            nperm = nperm + popcnt(iand(det1(j,ispin),ibclr(-1_bit_kind,n)+1_bit_kind))
-        endif
+        nperm = nperm + popcnt(                                    &
+             iand(det1(j,ispin),                                   &
+                  iand(not(0_bit_kind),                            &
+                       (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+             + popcnt(iand(det1(k,ispin),                          &
+                           (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+
         do i=j+1,k-1
           nperm = nperm + popcnt(det1(i,ispin))
         end do
+
       endif
+      
       phase = phase_dble(iand(nperm,1))
       return
       
     enddo
   enddo
+
 end
 
 subroutine bitstring_to_list_ab( string, list, n_elements, Nint)
@@ -456,7 +438,6 @@ subroutine bitstring_to_list_ab( string, list, n_elements, Nint)
   enddo
 
 end
-
 subroutine bitstring_to_list_ab_old( string, list, n_elements, Nint)
   use bitmasks
   implicit none
@@ -925,22 +906,29 @@ subroutine create_minilist(key_mask, fullList, miniList, idx_miniList, N_fullLis
   
   N_miniList = 0
   
+  integer :: e_ab
+  e_ab = n_a+n_b
   do i=1,N_fullList
-    e_a = n_a - popcnt(iand(fullList(1, 1, i), key_mask(1, 1)))
-    e_b = n_b - popcnt(iand(fullList(1, 2, i), key_mask(1, 2)))
+    e_a = e_ab - popcnt(iand(fullList(1, 1, i), key_mask(1, 1))) &
+               - popcnt(iand(fullList(1, 2, i), key_mask(1, 2)))
     do ni=2,nint
-      e_a -= popcnt(iand(fullList(ni, 1, i), key_mask(ni, 1)))
-      e_b -= popcnt(iand(fullList(ni, 2, i), key_mask(ni, 2)))
+      e_a = e_a - popcnt(iand(fullList(ni, 1, i), key_mask(ni, 1))) &
+                - popcnt(iand(fullList(ni, 2, i), key_mask(ni, 2)))
     end do
     
-    if(e_a + e_b <= 2) then
-      N_miniList = N_miniList + 1
-      do ni=1,Nint
-        miniList(ni,1,N_miniList) = fullList(ni,1,i)
-        miniList(ni,2,N_miniList) = fullList(ni,2,i)
-      enddo
-      idx_miniList(N_miniList) = i
-    end if
+    if(e_a > 2) then
+      cycle
+    endif
+
+    N_miniList = N_miniList + 1
+    miniList(1,1,N_miniList) = fullList(1,1,i)
+    miniList(1,2,N_miniList) = fullList(1,2,i)
+    do ni=2,Nint
+      miniList(ni,1,N_miniList) = fullList(ni,1,i)
+      miniList(ni,2,N_miniList) = fullList(ni,2,i)
+    enddo
+    idx_miniList(N_miniList) = i
+
   end do
 end subroutine
 
@@ -1526,14 +1514,16 @@ subroutine get_excitation_degree_vector_double_alpha_beta(key1,key2,degree,Nint,
     !DIR$ LOOP COUNT (1000)
     do i=1,sze
       d = 0
+      degree_alpha = 0
+      degree_beta  = 0
       !DIR$ LOOP COUNT MIN(4)
       do m=1,Nint
         d = d + popcnt(xor( key1(m,1,i), key2(m,1)))                 &
               + popcnt(xor( key1(m,2,i), key2(m,2)))
         key_tmp(m,1) = xor(key1(m,1,i),key2(m,1))
         key_tmp(m,2) = xor(key1(m,2,i),key2(m,2))
-        degree_alpha = popcnt(key_tmp(m,1)) 
-        degree_beta  = popcnt(key_tmp(m,2)) 
+        degree_alpha += popcnt(key_tmp(m,1)) 
+        degree_beta  += popcnt(key_tmp(m,2)) 
       enddo
       if(degree_alpha .gt.3 .or. degree_beta .gt.3 )cycle !! no double excitations of same spin
         degree(l) = ishft(d,-1)
@@ -1684,12 +1674,13 @@ subroutine get_excitation_degree_vector_mono_or_exchange_verbose(key1,key2,degre
     do i=1,sze
       d = 0
       exchange_1 = 0
+      exchange_2 = 0
       !DIR$ LOOP COUNT MIN(4)
       do m=1,Nint
         d = d + popcnt(xor( key1(m,1,i), key2(m,1)))                 &
               + popcnt(xor( key1(m,2,i), key2(m,2)))
-        exchange_1 = popcnt(xor(iand(key1(m,1,i),key1(m,2,i)),iand(key2(m,1),key2(m,2))))  
-        exchange_2 = popcnt(iand(xor(key1(m,1,i),key2(m,1)),xor(key1(m,2,i),key2(m,2))))   
+        exchange_1 += popcnt(xor(iand(key1(m,1,i),key1(m,2,i)),iand(key2(m,1),key2(m,2))))  
+        exchange_2 += popcnt(iand(xor(key1(m,1,i),key2(m,1)),xor(key1(m,2,i),key2(m,2))))   
       enddo
       if (d > 4)cycle
       if (d ==4)then  
@@ -1960,7 +1951,7 @@ subroutine a_operator(iorb,ispin,key,hjj,Nint,na,nb)
   ASSERT (Nint > 0)
   
   k = ishft(iorb-1,-bit_kind_shift)+1
-  ASSERT (k > 0)
+  ASSERT (k>0)
   l = iorb - ishft(k-1,bit_kind_shift)-1
   key(k,ispin) = ibclr(key(k,ispin),l)
   other_spin = iand(ispin,1)+1
@@ -2011,8 +2002,9 @@ subroutine ac_operator(iorb,ispin,key,hjj,Nint,na,nb)
   ASSERT (tmp(2) == elec_beta_num)
   
   k = ishft(iorb-1,-bit_kind_shift)+1
-  ASSERT (k > 0)
+  ASSERT (k >0)
   l = iorb - ishft(k-1,bit_kind_shift)-1
+  ASSERT (l >= 0)
   key(k,ispin) = ibset(key(k,ispin),l)
   other_spin = iand(ispin,1)+1
   
@@ -2045,6 +2037,112 @@ subroutine get_occ_from_key(key,occ,Nint)
   call bitstring_to_list_ab(key, occ, tmp, Nint)
   
 end
+
+
+subroutine get_double_excitation_phase_new(det1,det2,exc,phase,Nint)
+  use bitmasks
+  implicit none
+  
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint,2)
+  integer(bit_kind), intent(in)  :: det2(Nint,2)
+  integer, intent(in)           :: exc(0:2,2,2)
+  double precision, intent(out)  :: phase
+  integer                        :: tz
+  integer                        :: l, ispin, idx_hole, idx_particle, ishift
+  integer                        :: nperm
+  integer                        :: i,j,k,m,n
+  integer                        :: high, low
+  integer                        :: a,b,c,d
+  integer(bit_kind)              :: hole, particle, tmp
+  double precision, parameter    :: phase_dble(0:1) = (/ 1.d0, -1.d0 /)
+
+  ASSERT (Nint > 0)
+  nperm = 0
+  do ispin = 1,2
+    select case (exc(0,1,ispin))
+      case(0)
+        cycle
+
+      case(1)
+
+        high = max(exc(1,1,ispin), exc(1,2,ispin))-1
+        low  = min(exc(1,1,ispin), exc(1,2,ispin))
+
+        ASSERT (low >= 0)
+        ASSERT (high > 0)
+
+        k = ishft(high,-bit_kind_shift)
+        j = ishft(low,-bit_kind_shift)
+        m = iand(high,bit_kind_size-1)
+        n = iand(low,bit_kind_size-1)
+        
+        if (j==k) then
+          nperm = nperm + popcnt(iand(det1(j,ispin),           &
+              iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                  not(ishft(1_bit_kind,n))+1_bit_kind)) )
+        else
+          nperm = nperm + popcnt(                                    &
+               iand(det1(j,ispin),                                   &
+                    iand(not(0_bit_kind),                            &
+                         (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+               + popcnt(iand(det1(k,ispin),                          &
+                             (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+
+          do i=j+1,k-1
+            nperm = nperm + popcnt(det1(i,ispin))
+          end do
+
+        endif
+        
+      case (2)
+        
+        do l=1,2
+          high = max(exc(l,1,ispin), exc(l,2,ispin))-1
+          low  = min(exc(l,1,ispin), exc(l,2,ispin))
+
+          ASSERT (low > 0)
+          ASSERT (high > 0)
+
+          k = ishft(high,-bit_kind_shift)
+          j = ishft(low,-bit_kind_shift)
+          m = iand(high,bit_kind_size-1)
+          n = iand(low,bit_kind_size-1)
+          
+          if (j==k) then
+            nperm = nperm + popcnt(iand(det1(j,ispin),           &
+                iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                  not(ishft(1_bit_kind,n))+1_bit_kind)) )
+          else
+            nperm = nperm + popcnt(                                    &
+                 iand(det1(j,ispin),                                   &
+                      iand(not(0_bit_kind),                            &
+                           (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+                 + popcnt(iand(det1(k,ispin),                          &
+                               (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+    
+            do i=j+1,k-1
+              nperm = nperm + popcnt(det1(i,ispin))
+            end do
+    
+          endif
+          
+        enddo
+        
+        a = min(exc(1,1,ispin), exc(1,2,ispin))
+        b = max(exc(1,1,ispin), exc(1,2,ispin))
+        c = min(exc(2,1,ispin), exc(2,2,ispin))
+        d = max(exc(2,1,ispin), exc(2,2,ispin))
+        if (c>a .and. c<b .and. d>b) then
+          nperm = nperm + 1
+        endif
+        exit
+    end select
+
+  enddo
+  phase = phase_dble(iand(nperm,1))
+end
+
 
 
 subroutine get_double_excitation_phase(det1,det2,exc,phase,Nint)
@@ -2147,8 +2245,8 @@ end
 subroutine get_phase(key1,key2,phase,Nint)
   use bitmasks
   implicit none
-  integer(bit_kind), intent(in)  :: key1(Nint,2), key2(Nint,2)
   integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: key1(Nint,2), key2(Nint,2)
   double precision, intent(out)  :: phase
   BEGIN_DOC
 ! Returns the phase between key1 and key2
@@ -2199,3 +2297,774 @@ subroutine u_0_H_u_0_stored(e_0,u_0,hmatrix,sze)
   call matrix_vector_product(u_0,v_0,hmatrix,sze,sze)
   e_0 =  u_dot_v(v_0,u_0,sze)
 end
+
+
+
+! Spin-determinant routines
+! -------------------------
+
+subroutine get_excitation_degree_spin(key1,key2,degree,Nint)
+  use bitmasks
+  include 'Utils/constants.include.F'
+  implicit none
+  BEGIN_DOC
+  ! Returns the excitation degree between two determinants
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: key1(Nint)
+  integer(bit_kind), intent(in)  :: key2(Nint)
+  integer, intent(out)           :: degree
+  
+  integer(bit_kind)              :: xorvec(N_int_max)
+  integer                        :: l
+  
+  ASSERT (Nint > 0)
+  
+  select case (Nint)
+
+    case (1)
+      xorvec(1) = xor( key1(1), key2(1))
+      degree = popcnt(xorvec(1))
+
+    case (2)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      degree = popcnt(xorvec(1))+popcnt(xorvec(2))
+
+    case (3)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      xorvec(3) = xor( key1(3), key2(3))
+      degree = sum(popcnt(xorvec(1:3)))
+
+    case (4)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      xorvec(3) = xor( key1(3), key2(3))
+      xorvec(4) = xor( key1(4), key2(4))
+      degree = sum(popcnt(xorvec(1:4)))
+
+    case default
+      do l=1,Nint
+        xorvec(l) = xor( key1(l), key2(l))
+      enddo
+      degree = sum(popcnt(xorvec(1:Nint)))
+  
+  end select
+
+  degree = ishft(degree,-1)
+  
+end
+
+
+subroutine get_excitation_spin(det1,det2,exc,degree,phase,Nint)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns the excitation operators between two determinants and the phase
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint)
+  integer(bit_kind), intent(in)  :: det2(Nint)
+  integer, intent(out)           :: exc(0:2,2)
+  integer, intent(out)           :: degree
+  double precision, intent(out)  :: phase
+  ! exc(number,hole/particle)
+  ! ex :
+  ! exc(0,1) = number of holes
+  ! exc(0,2) = number of particles
+  ! exc(1,2) = first particle 
+  ! exc(1,1) = first hole     
+  
+  ASSERT (Nint > 0)
+  
+  !DIR$ FORCEINLINE
+  call get_excitation_degree_spin(det1,det2,degree,Nint)
+  select case (degree)
+      
+    case (3:)
+      degree = -1
+      return
+      
+    case (2)
+      call get_double_excitation_spin(det1,det2,exc,phase,Nint)
+      return
+      
+    case (1)
+      call get_mono_excitation_spin(det1,det2,exc,phase,Nint)
+      return
+      
+    case(0)
+      return
+      
+  end select
+end
+
+subroutine decode_exc_spin(exc,h1,p1,h2,p2)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Decodes the exc arrays returned by get_excitation.
+  ! h1,h2 : Holes
+  ! p1,p2 : Particles
+  END_DOC
+  integer, intent(in)            :: exc(0:2,2)
+  integer, intent(out)           :: h1,h2,p1,p2
+  
+  select case (exc(0,1))
+    case(2)
+      h1 = exc(1,1)
+      h2 = exc(2,1)
+      p1 = exc(1,2)
+      p2 = exc(2,2)
+    case(1)
+      h1 = exc(1,1)
+      h2 = 0
+      p1 = exc(1,2)
+      p2 = 0
+    case default
+      h1 = 0
+      p1 = 0
+      h2 = 0
+      p2 = 0
+  end select
+end
+
+subroutine get_excitation_degree_spin_new(key1,key2,degree,Nint)
+  use bitmasks
+  include 'Utils/constants.include.F'
+  implicit none
+  BEGIN_DOC
+  ! Returns the excitation degree between two determinants
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: key1(Nint)
+  integer(bit_kind), intent(in)  :: key2(Nint)
+  integer, intent(out)           :: degree
+  
+  integer(bit_kind)              :: xorvec(N_int_max)
+  integer                        :: l
+  
+  ASSERT (Nint > 0)
+  
+  select case (Nint)
+
+    case (1)
+      xorvec(1) = xor( key1(1), key2(1))
+      degree = popcnt(xorvec(1))
+
+    case (2)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      degree = popcnt(xorvec(1))+popcnt(xorvec(2))
+
+    case (3)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      xorvec(3) = xor( key1(3), key2(3))
+      degree = sum(popcnt(xorvec(1:3)))
+
+    case (4)
+      xorvec(1) = xor( key1(1), key2(1))
+      xorvec(2) = xor( key1(2), key2(2))
+      xorvec(3) = xor( key1(3), key2(3))
+      xorvec(4) = xor( key1(4), key2(4))
+      degree = sum(popcnt(xorvec(1:4)))
+
+    case default
+      do l=1,Nint
+        xorvec(l) = xor( key1(l), key2(l))
+      enddo
+      degree = sum(popcnt(xorvec(1:Nint)))
+  
+  end select
+
+  degree = ishft(degree,-1)
+  
+end
+
+
+subroutine get_excitation_spin_new(det1,det2,exc,degree,phase,Nint)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns the excitation operators between two determinants and the phase
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint)
+  integer(bit_kind), intent(in)  :: det2(Nint)
+  integer, intent(out)           :: exc(0:2,2)
+  integer, intent(out)           :: degree
+  double precision, intent(out)  :: phase
+  ! exc(number,hole/particle)
+  ! ex :
+  ! exc(0,1) = number of holes
+  ! exc(0,2) = number of particles
+  ! exc(1,2) = first particle 
+  ! exc(1,1) = first hole     
+  
+  ASSERT (Nint > 0)
+  
+  !DIR$ FORCEINLINE
+  call get_excitation_degree_spin(det1,det2,degree,Nint)
+  select case (degree)
+      
+    case (3:)
+      degree = -1
+      return
+      
+    case (2)
+      call get_double_excitation_spin(det1,det2,exc,phase,Nint)
+      return
+      
+    case (1)
+      call get_mono_excitation_spin(det1,det2,exc,phase,Nint)
+      return
+      
+    case(0)
+      return
+      
+  end select
+end
+
+subroutine decode_exc_spin_new(exc,h1,p1,h2,p2)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Decodes the exc arrays returned by get_excitation.
+  ! h1,h2 : Holes
+  ! p1,p2 : Particles
+  END_DOC
+  integer, intent(in)            :: exc(0:2,2)
+  integer, intent(out)           :: h1,h2,p1,p2
+  
+  select case (exc(0,1))
+    case(2)
+      h1 = exc(1,1)
+      h2 = exc(2,1)
+      p1 = exc(1,2)
+      p2 = exc(2,2)
+    case(1)
+      h1 = exc(1,1)
+      h2 = 0
+      p1 = exc(1,2)
+      p2 = 0
+    case default
+      h1 = 0
+      p1 = 0
+      h2 = 0
+      p2 = 0
+  end select
+end
+
+
+subroutine get_double_excitation_spin_new(det1,det2,exc,phase,Nint)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns the two excitation operators between two doubly excited spin-determinants
+  ! and the phase
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint)
+  integer(bit_kind), intent(in)  :: det2(Nint)
+  integer, intent(out)           :: exc(0:2,2)
+  double precision, intent(out)  :: phase
+  integer                        :: tz
+  integer                        :: l, idx_hole, idx_particle, ishift
+  integer                        :: nperm
+  integer                        :: i,j,k,m,n
+  integer                        :: high, low
+  integer                        :: a,b,c,d
+  integer(bit_kind)              :: hole, particle, tmp
+  double precision, parameter    :: phase_dble(0:1) = (/ 1.d0, -1.d0 /)
+  
+  ASSERT (Nint > 0)
+  nperm = 0
+  exc(0,1) = 0
+  exc(0,2) = 0
+  
+  idx_particle = 0
+  idx_hole = 0
+  ishift = 1-bit_kind_size
+  do l=1,Nint
+    ishift = ishift + bit_kind_size
+    if (det1(l) == det2(l)) then
+      cycle
+    endif
+    tmp = xor( det1(l), det2(l) )
+    particle = iand(tmp, det2(l))
+    hole     = iand(tmp, det1(l))
+    do while (particle /= 0_bit_kind)
+      tz = trailz(particle)
+      idx_particle = idx_particle + 1
+      exc(0,2) = exc(0,2) + 1
+      exc(idx_particle,2) = tz+ishift
+      particle = iand(particle,particle-1_bit_kind)
+    enddo
+    if (iand(exc(0,1),exc(0,2))==2) then  ! exc(0,1)==2 or exc(0,2)==2
+      exit
+    endif
+    do while (hole /= 0_bit_kind)
+      tz = trailz(hole)
+      idx_hole = idx_hole + 1
+      exc(0,1) = exc(0,1) + 1
+      exc(idx_hole,1) = tz+ishift
+      hole = iand(hole,hole-1_bit_kind)
+    enddo
+    if (iand(exc(0,1),exc(0,2))==2) then ! exc(0,1)==2 or exc(0,2)==2
+      exit
+    endif
+  enddo
+  
+  select case (exc(0,1))
+      
+    case(1)
+
+      high = max(exc(1,1), exc(1,2))-1
+      low  = min(exc(1,1), exc(1,2))
+
+      ASSERT (low >= 0)
+      ASSERT (high > 0)
+
+      k = ishft(high,-bit_kind_shift)
+      j = ishft(low,-bit_kind_shift)
+      m = iand(high,bit_kind_size-1)
+      n = iand(low,bit_kind_size-1)
+      
+      if (j==k) then
+        nperm = nperm + popcnt(iand(det1(j),                 &
+            iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                  not(ishft(1_bit_kind,n))+1_bit_kind)) )
+      else
+        nperm = nperm + popcnt(                                    &
+             iand(det1(j),                                         &
+                  iand(not(0_bit_kind),                            &
+                       (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+             + popcnt(iand(det1(k),                                &
+                           (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+
+        do i=j+1,k-1
+          nperm = nperm + popcnt(det1(i))
+        end do
+
+      endif
+      
+    case (2)
+      
+      do l=1,2
+        high = max(exc(l,1), exc(l,2))-1
+        low  = min(exc(l,1), exc(l,2))
+
+        ASSERT (low > 0)
+        ASSERT (high > 0)
+
+        k = ishft(high,-bit_kind_shift)
+        j = ishft(low,-bit_kind_shift)
+        m = iand(high,bit_kind_size-1)
+        n = iand(low,bit_kind_size-1)
+        
+        if (j==k) then
+          nperm = nperm + popcnt(iand(det1(j),                 &
+              iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                  not(ishft(1_bit_kind,n))+1_bit_kind)) )
+        else
+          nperm = nperm + popcnt(                                    &
+               iand(det1(j),                                         &
+                    iand(not(0_bit_kind),                            &
+                         (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+               + popcnt(iand(det1(k),                                &
+                             (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+  
+          do i=j+1,k-1
+            nperm = nperm + popcnt(det1(i))
+          end do
+  
+        endif
+        
+      enddo
+        
+      a = min(exc(1,1), exc(1,2))
+      b = max(exc(1,1), exc(1,2))
+      c = min(exc(2,1), exc(2,2))
+      d = max(exc(2,1), exc(2,2))
+      if (c>a .and. c<b .and. d>b) then
+        nperm = nperm + 1
+      endif
+  end select
+  
+  phase = phase_dble(iand(nperm,1))
+  
+end
+
+subroutine get_mono_excitation_spin_new(det1,det2,exc,phase,Nint)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns the excitation operator between two singly excited determinants and the phase
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint)
+  integer(bit_kind), intent(in)  :: det2(Nint)
+  integer, intent(out)           :: exc(0:2,2)
+  double precision, intent(out)  :: phase
+  integer                        :: tz
+  integer                        :: l, idx_hole, idx_particle, ishift
+  integer                        :: nperm
+  integer                        :: i,j,k,m,n
+  integer                        :: high, low
+  integer                        :: a,b,c,d
+  integer(bit_kind)              :: hole, particle, tmp
+  double precision, parameter    :: phase_dble(0:1) = (/ 1.d0, -1.d0 /)
+  
+  ASSERT (Nint > 0)
+  nperm = 0
+  exc(0,1) = 0
+  exc(0,2) = 0
+  
+  ishift = 1-bit_kind_size
+  do l=1,Nint
+    ishift = ishift + bit_kind_size
+    if (det1(l) == det2(l)) then
+      cycle
+    endif
+    tmp = xor( det1(l), det2(l) )
+    particle = iand(tmp, det2(l))
+    hole     = iand(tmp, det1(l))
+    if (particle /= 0_bit_kind) then
+      tz = trailz(particle)
+      exc(0,2) = 1
+      exc(1,2) = tz+ishift
+    endif
+    if (hole /= 0_bit_kind) then
+      tz = trailz(hole)
+      exc(0,1) = 1
+      exc(1,1) = tz+ishift
+    endif
+    
+    if ( iand(exc(0,1),exc(0,2)) /= 1) then  ! exc(0,1)/=1 and exc(0,2) /= 1
+      cycle
+    endif
+    
+    high = max(exc(1,1), exc(1,2))-1
+    low  = min(exc(1,1), exc(1,2))
+
+    ASSERT (low >= 0)
+    ASSERT (high > 0)
+
+    k = ishft(high,-bit_kind_shift)
+    j = ishft(low,-bit_kind_shift)
+    m = iand(high,bit_kind_size-1)
+    n = iand(low,bit_kind_size-1)
+    
+    if (j==k) then
+      nperm = nperm + popcnt(iand(det1(j),                 &
+          iand( ishft(1_bit_kind,m)-1_bit_kind,            &
+                  not(ishft(1_bit_kind,n))+1_bit_kind)) )
+    else
+      nperm = nperm + popcnt(                                    &
+           iand(det1(j),                                         &
+                iand(not(0_bit_kind),                            &
+                     (not(ishft(1_bit_kind,n)) + 1_bit_kind) ))) &
+           + popcnt(iand(det1(k),                                &
+                         (ishft(1_bit_kind,m) - 1_bit_kind ) ))
+
+      do i=j+1,k-1
+        nperm = nperm + popcnt(det1(i))
+      end do
+
+    endif
+      
+    phase = phase_dble(iand(nperm,1))
+    return
+    
+  enddo
+end
+
+subroutine get_double_excitation_spin(det1,det2,exc,phase,Nint)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns the two excitation operators between two doubly excited spin-determinants
+  ! and the phase
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint)
+  integer(bit_kind), intent(in)  :: det2(Nint)
+  integer, intent(out)           :: exc(0:2,2)
+  double precision, intent(out)  :: phase
+  integer                        :: tz
+  integer                        :: l, idx_hole, idx_particle, ishift
+  integer                        :: nperm
+  integer                        :: i,j,k,m,n
+  integer                        :: high, low
+  integer                        :: a,b,c,d
+  integer(bit_kind)              :: hole, particle, tmp
+  double precision, parameter    :: phase_dble(0:1) = (/ 1.d0, -1.d0 /)
+  
+  ASSERT (Nint > 0)
+  nperm = 0
+  exc(0,1) = 0
+  exc(0,2) = 0
+  
+  idx_particle = 0
+  idx_hole = 0
+  ishift = 1-bit_kind_size
+  do l=1,Nint
+    ishift = ishift + bit_kind_size
+    if (det1(l) == det2(l)) then
+      cycle
+    endif
+    tmp = xor( det1(l), det2(l) )
+    particle = iand(tmp, det2(l))
+    hole     = iand(tmp, det1(l))
+    do while (particle /= 0_bit_kind)
+      tz = trailz(particle)
+      idx_particle = idx_particle + 1
+      exc(0,2) = exc(0,2) + 1
+      exc(idx_particle,2) = tz+ishift
+      particle = iand(particle,particle-1_bit_kind)
+    enddo
+    if (iand(exc(0,1),exc(0,2))==2) then  ! exc(0,1)==2 or exc(0,2)==2
+      exit
+    endif
+    do while (hole /= 0_bit_kind)
+      tz = trailz(hole)
+      idx_hole = idx_hole + 1
+      exc(0,1) = exc(0,1) + 1
+      exc(idx_hole,1) = tz+ishift
+      hole = iand(hole,hole-1_bit_kind)
+    enddo
+    if (iand(exc(0,1),exc(0,2))==2) then ! exc(0,1)==2 or exc(0,2)==2
+      exit
+    endif
+  enddo
+  
+  select case (exc(0,1))
+      
+    case(1)
+      low  = min(exc(1,1), exc(1,2))
+      high = max(exc(1,1), exc(1,2))
+      
+      ASSERT (low > 0)
+      j = ishft(low-1,-bit_kind_shift)+1   ! Find integer in array(Nint)
+      n = iand(low-1,bit_kind_size-1)+1        ! mod(low,bit_kind_size)
+      ASSERT (high > 0)
+      k = ishft(high-1,-bit_kind_shift)+1
+      m = iand(high-1,bit_kind_size-1)+1
+      
+      if (j==k) then
+        nperm = nperm + popcnt(iand(det1(j),                         &
+            iand( ibset(0_bit_kind,m-1)-1_bit_kind,                  &
+            ibclr(-1_bit_kind,n)+1_bit_kind ) ))
+      else
+        nperm = nperm + popcnt(iand(det1(k),                         &
+            ibset(0_bit_kind,m-1)-1_bit_kind))
+        if (n < bit_kind_size) then
+          nperm = nperm + popcnt(iand(det1(j), ibclr(-1_bit_kind,n) +1_bit_kind))
+        endif
+        do i=j+1,k-1
+          nperm = nperm + popcnt(det1(i))
+        end do
+      endif
+      
+    case (2)
+      
+      do i=1,2
+        low  = min(exc(i,1), exc(i,2))
+        high = max(exc(i,1), exc(i,2))
+        
+        ASSERT (low > 0)
+        j = ishft(low-1,-bit_kind_shift)+1   ! Find integer in array(Nint)
+        n = iand(low-1,bit_kind_size-1)+1        ! mod(low,bit_kind_size)
+        ASSERT (high > 0)
+        k = ishft(high-1,-bit_kind_shift)+1
+        m = iand(high-1,bit_kind_size-1)+1
+        
+        if (j==k) then
+          nperm = nperm + popcnt(iand(det1(j),                       &
+              iand( ibset(0_bit_kind,m-1)-1_bit_kind,                &
+              ibclr(-1_bit_kind,n)+1_bit_kind ) ))
+        else
+          nperm = nperm + popcnt(iand(det1(k),                       &
+              ibset(0_bit_kind,m-1)-1_bit_kind))
+          if (n < bit_kind_size) then
+            nperm = nperm + popcnt(iand(det1(j), ibclr(-1_bit_kind,n) +1_bit_kind))
+          endif
+          do l=j+1,k-1
+            nperm = nperm + popcnt(det1(l))
+          end do
+        endif
+        
+      enddo
+      
+      a = min(exc(1,1), exc(1,2))
+      b = max(exc(1,1), exc(1,2))
+      c = min(exc(2,1), exc(2,2))
+      d = max(exc(2,1), exc(2,2))
+      if (c>a .and. c<b .and. d>b) then
+        nperm = nperm + 1
+      endif
+  end select
+  
+  phase = phase_dble(iand(nperm,1))
+  
+end
+
+subroutine get_mono_excitation_spin(det1,det2,exc,phase,Nint)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns the excitation operator between two singly excited determinants and the phase
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: det1(Nint)
+  integer(bit_kind), intent(in)  :: det2(Nint)
+  integer, intent(out)           :: exc(0:2,2)
+  double precision, intent(out)  :: phase
+  integer                        :: tz
+  integer                        :: l, idx_hole, idx_particle, ishift
+  integer                        :: nperm
+  integer                        :: i,j,k,m,n
+  integer                        :: high, low
+  integer                        :: a,b,c,d
+  integer(bit_kind)              :: hole, particle, tmp
+  double precision, parameter    :: phase_dble(0:1) = (/ 1.d0, -1.d0 /)
+  
+  ASSERT (Nint > 0)
+  nperm = 0
+  exc(0,1) = 0
+  exc(0,2) = 0
+  
+  ishift = 1-bit_kind_size
+  do l=1,Nint
+    ishift = ishift + bit_kind_size
+    if (det1(l) == det2(l)) then
+      cycle
+    endif
+    tmp = xor( det1(l), det2(l) )
+    particle = iand(tmp, det2(l))
+    hole     = iand(tmp, det1(l))
+    if (particle /= 0_bit_kind) then
+      tz = trailz(particle)
+      exc(0,2) = 1
+      exc(1,2) = tz+ishift
+    endif
+    if (hole /= 0_bit_kind) then
+      tz = trailz(hole)
+      exc(0,1) = 1
+      exc(1,1) = tz+ishift
+    endif
+    
+    if ( iand(exc(0,1),exc(0,2)) /= 1) then  ! exc(0,1)/=1 and exc(0,2) /= 1
+      cycle
+    endif
+    
+    low = min(exc(1,1),exc(1,2))
+    high = max(exc(1,1),exc(1,2))
+    
+    ASSERT (low > 0)
+    j = ishft(low-1,-bit_kind_shift)+1   ! Find integer in array(Nint)
+    n = iand(low-1,bit_kind_size-1)+1      ! mod(low,bit_kind_size)
+    ASSERT (high > 0)
+    k = ishft(high-1,-bit_kind_shift)+1
+    m = iand(high-1,bit_kind_size-1)+1
+    if (j==k) then
+      nperm = popcnt(iand(det1(j),                                   &
+          iand(ibset(0_bit_kind,m-1)-1_bit_kind,ibclr(-1_bit_kind,n)+1_bit_kind)))
+    else
+      nperm = nperm + popcnt(iand(det1(k),ibset(0_bit_kind,m-1)-1_bit_kind))
+      if (n < bit_kind_size) then
+        nperm = nperm + popcnt(iand(det1(j),ibclr(-1_bit_kind,n)+1_bit_kind))
+      endif
+      do i=j+1,k-1
+        nperm = nperm + popcnt(det1(i))
+      end do
+    endif
+    phase = phase_dble(iand(nperm,1))
+    return
+    
+  enddo
+end
+
+subroutine i_H_j_mono_spin(key_i,key_j,Nint,spin,hij)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns <i|H|j> where i and j are determinants differing by a single excitation
+  END_DOC
+  integer, intent(in)            :: Nint, spin
+  integer(bit_kind), intent(in)  :: key_i(Nint,2), key_j(Nint,2)
+  double precision, intent(out)  :: hij
+  
+  integer                        :: exc(0:2,2)
+  double precision               :: phase
+
+  PROVIDE big_array_exchange_integrals mo_bielec_integrals_in_map
+
+  call get_mono_excitation_spin(key_i(1,spin),key_j(1,spin),exc,phase,Nint)
+  call get_mono_excitation_from_fock(key_i,key_j,exc(1,1),exc(1,2),spin,phase,hij)
+end
+
+subroutine i_H_j_double_spin(key_i,key_j,Nint,hij)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns <i|H|j> where i and j are determinants differing by a same-spin double excitation
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: key_i(Nint), key_j(Nint)
+  double precision, intent(out)  :: hij
+  
+  integer                        :: exc(0:2,2)
+  double precision               :: phase
+  double precision, external     :: get_mo_bielec_integral
+
+  PROVIDE big_array_exchange_integrals mo_bielec_integrals_in_map
+
+  call get_double_excitation_spin(key_i,key_j,exc,phase,Nint)
+  hij = phase*(get_mo_bielec_integral(                               &
+      exc(1,1),                                                      &
+      exc(2,1),                                                      &
+      exc(1,2),                                                      &
+      exc(2,2), mo_integrals_map) -                                  &
+      get_mo_bielec_integral(                                        &
+      exc(1,1),                                                      &
+      exc(2,1),                                                      &
+      exc(2,2),                                                      &
+      exc(1,2), mo_integrals_map) )
+end
+
+subroutine i_H_j_double_alpha_beta(key_i,key_j,Nint,hij)
+  use bitmasks
+  implicit none
+  BEGIN_DOC
+  ! Returns <i|H|j> where i and j are determinants differing by an opposite-spin double excitation
+  END_DOC
+  integer, intent(in)            :: Nint
+  integer(bit_kind), intent(in)  :: key_i(Nint,2), key_j(Nint,2)
+  double precision, intent(out)  :: hij
+  
+  integer                        :: exc(0:2,2,2)
+  double precision               :: phase, phase2
+  double precision, external     :: get_mo_bielec_integral
+
+  PROVIDE big_array_exchange_integrals mo_bielec_integrals_in_map
+
+  call get_mono_excitation_spin(key_i(1,1),key_j(1,1),exc(0,1,1),phase,Nint)
+  call get_mono_excitation_spin(key_i(1,2),key_j(1,2),exc(0,1,2),phase2,Nint)
+  phase = phase*phase2
+  if (exc(1,1,1) == exc(1,2,2)) then
+    hij = phase * big_array_exchange_integrals(exc(1,1,1),exc(1,1,2),exc(1,2,1))
+  else if (exc(1,2,1) == exc(1,1,2)) then
+    hij = phase * big_array_exchange_integrals(exc(1,2,1),exc(1,1,1),exc(1,2,2))
+  else
+    hij = phase*get_mo_bielec_integral(                              &
+        exc(1,1,1),                                                  &
+        exc(1,1,2),                                                  &
+        exc(1,2,1),                                                  &
+        exc(1,2,2) ,mo_integrals_map)
+  endif
+end
+
+

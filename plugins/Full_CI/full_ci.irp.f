@@ -3,6 +3,11 @@ program full_ci
   integer                        :: i,k
 
   
+  print *,  '===================================================================='
+  print *,  'This program is slow. Consider using the Full_CI_ZMQ module instead.'
+  print *,  '===================================================================='
+  call sleep(2)
+
   double precision, allocatable  :: pt2(:), norm_pert(:), H_pert_diag(:)
   integer                        :: N_st, degree
   N_st = N_states
@@ -90,7 +95,7 @@ program full_ci
    N_det = min(N_det_max,N_det)
    touch N_det psi_det psi_coef
    call diagonalize_CI
-   if(do_pt2_end)then
+   if(do_pt2)then
     print*,'Last iteration only to compute the PT2'
     threshold_generators = threshold_generators_pt2
     threshold_selectors = threshold_selectors_pt2

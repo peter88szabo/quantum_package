@@ -23,7 +23,7 @@ subroutine create_guess
       mo_coef = ao_ortho_lowdin_coef
       TOUCH mo_coef
       mo_label = 'Guess'
-      call mo_as_eigvectors_of_mo_matrix(mo_mono_elec_integral,size(mo_mono_elec_integral,1),size(mo_mono_elec_integral,2),mo_label)
+      call mo_as_eigvectors_of_mo_matrix(mo_mono_elec_integral,size(mo_mono_elec_integral,1),size(mo_mono_elec_integral,2),mo_label,.false.)
       SOFT_TOUCH mo_coef mo_label
     else if (mo_guess_type == "Huckel") then
       call huckel_guess
@@ -33,8 +33,6 @@ subroutine create_guess
     endif
   endif
 end
-
-ao_to_mo
 
 subroutine run
 
@@ -55,13 +53,9 @@ subroutine run
 
 ! Choose SCF algorithm
 
-  if(scf_algorithm == 'damp') then
-    call damping_SCF
-  else if(scf_algorithm == 'DIIS') then
-    call Roothaan_Hall_SCF
-  else
-    write(*,*) 'Unrecognized SCF algorithm: '//scf_algorithm
-    stop 1
-  endif
+!    call damping_SCF   ! Deprecated routine
+  call Roothaan_Hall_SCF
   
 end
+
+

@@ -26,7 +26,7 @@ subroutine svd(A,LDA,U,LDU,D,Vt,LDVt,m,n)
   lwork = -1
   call dgesvd('A','A', m, n, A_tmp, LDA,                             &
       D, U, LDU, Vt, LDVt, work, lwork, info)
-  lwork = work(1)
+  lwork = int(work(1))
   deallocate(work)
 
   allocate(work(lwork))
@@ -69,7 +69,7 @@ subroutine ortho_canonical(overlap,LDA,N,C,LDC,m)
   double precision, allocatable  :: U(:,:)
   double precision, allocatable  :: Vt(:,:)
   double precision, allocatable  :: D(:)
-  double precision, allocatable  :: S_half(:,:)
+  double precision, allocatable  :: S(:,:)
   !DEC$ ATTRIBUTES ALIGN : 64    :: U, Vt, D
   integer                        :: info, i, j
   
@@ -77,7 +77,7 @@ subroutine ortho_canonical(overlap,LDA,N,C,LDC,m)
     return
   endif
 
-  allocate (U(ldc,n), Vt(lda,n), D(n), S_half(lda,n))
+  allocate (U(ldc,n), Vt(lda,n), D(n), S(lda,n))
 
   call svd(overlap,lda,U,ldc,D,Vt,lda,n,n)
 
@@ -103,13 +103,13 @@ subroutine ortho_canonical(overlap,LDA,N,C,LDC,m)
 
 
   !$OMP PARALLEL DEFAULT(NONE) &
-  !$OMP SHARED(S_half,U,D,Vt,n,C,m) &
+  !$OMP SHARED(S,U,D,Vt,n,C,m) &
   !$OMP PRIVATE(i,j)
 
   !$OMP DO
   do j=1,n
     do i=1,n
-      S_half(i,j) = U(i,j)*D(j)
+      S(i,j) = U(i,j)*D(j)
     enddo
     do i=1,n
       U(i,j) = C(i,j)
@@ -119,8 +119,8 @@ subroutine ortho_canonical(overlap,LDA,N,C,LDC,m)
   
   !$OMP END PARALLEL
 
-  call dgemm('N','N',n,m,n,1.d0,U,size(U,1),S_half,size(S_half,1),0.d0,C,size(C,1))
-  deallocate (U, Vt, D, S_half)
+  call dgemm('N','N',n,m,n,1.d0,U,size(U,1),S,size(S,1),0.d0,C,size(C,1))
+  deallocate (U, Vt, D, S)
   
 end
 
@@ -149,11 +149,11 @@ subroutine ortho_qr(A,LDA,m,n)
   allocate (jpvt(n), tau(n), work(1))
   LWORK=-1
   call  dgeqrf( m, n, A, LDA, TAU, WORK, LWORK, INFO )
-  LWORK=2*WORK(1)
+  LWORK=2*int(WORK(1))
   deallocate(WORK)
   allocate(WORK(LWORK))
-  call  dgeqrf( m, n, A, LDA, TAU, WORK, LWORK, INFO )
-  call dorgqr(m, n, n, A, LDA, tau, WORK, LWORK, INFO)
+  call  dgeqrf(m, n, A, LDA, TAU, WORK, LWORK, INFO )
+  call  dorgqr(m, n, n, A, LDA, tau, WORK, LWORK, INFO)
   deallocate(WORK,jpvt,tau)
 end
 
@@ -210,19 +210,19 @@ subroutine ortho_lowdin(overlap,LDA,N,C,LDC,m)
   double precision, allocatable  :: U(:,:)
   double precision, allocatable  :: Vt(:,:)
   double precision, allocatable  :: D(:)
-  double precision, allocatable  :: S_half(:,:)
+  double precision, allocatable  :: S(:,:)
   integer                        :: info, i, j, k
   
   if (n < 2) then
     return
   endif
 
-  allocate(U(ldc,n),Vt(lda,n),S_half(lda,n),D(n))
+  allocate(U(ldc,n),Vt(lda,n),S(lda,n),D(n))
 
   call svd(overlap,lda,U,ldc,D,Vt,lda,n,n)
 
   !$OMP PARALLEL DEFAULT(NONE) &
-  !$OMP SHARED(S_half,U,D,Vt,n,C,m) &
+  !$OMP SHARED(S,U,D,Vt,n,C,m) &
   !$OMP PRIVATE(i,j,k)
 
   !$OMP DO
@@ -233,7 +233,7 @@ subroutine ortho_lowdin(overlap,LDA,N,C,LDC,m)
       D(i) = 1.d0/dsqrt(D(i))
     endif
     do j=1,n
-      S_half(j,i) = 0.d0
+      S(j,i) = 0.d0
     enddo
   enddo
   !$OMP END DO
@@ -243,7 +243,7 @@ subroutine ortho_lowdin(overlap,LDA,N,C,LDC,m)
       !$OMP DO
       do j=1,n
         do i=1,n
-          S_half(i,j) = S_half(i,j) + U(i,k)*D(k)*Vt(k,j)
+          S(i,j) = S(i,j) + U(i,k)*D(k)*Vt(k,j)
         enddo
       enddo
       !$OMP END DO NOWAIT
@@ -261,21 +261,49 @@ subroutine ortho_lowdin(overlap,LDA,N,C,LDC,m)
   
   !$OMP END PARALLEL
 
-  call dgemm('N','N',m,n,n,1.d0,U,size(U,1),S_half,size(S_half,1),0.d0,C,size(C,1))
+  call dgemm('N','N',m,n,n,1.d0,U,size(U,1),S,size(S,1),0.d0,C,size(C,1))
   
-  deallocate(U,Vt,S_half,D)
+  deallocate(U,Vt,S,D)
 end
 
 
 
-subroutine get_pseudo_inverse(A,m,n,C,LDA)
+subroutine get_inverse(A,LDA,m,C,LDC)
+  implicit none
+  BEGIN_DOC
+  ! Returns the inverse of the square matrix A
+  END_DOC
+  integer, intent(in)            :: m, LDA, LDC
+  double precision, intent(in)   :: A(LDA,m)
+  double precision, intent(out)  :: C(LDC,m)
+
+  integer                        :: info,lwork
+  integer, allocatable           :: ipiv(:)
+  double precision,allocatable   :: work(:)
+  allocate (ipiv(ao_num), work(ao_num*ao_num))
+  lwork = size(work)
+  C(1:m,1:m) = A(1:m,1:m)
+  call dgetrf(m,m,C,size(C,1),ipiv,info)
+  if (info /= 0) then
+    print *,  info
+    stop 'error in inverse (dgetrf)'
+  endif
+  call dgetri(m,C,size(C,1),ipiv,work,lwork,info)
+  if (info /= 0) then
+    print *,  info
+    stop 'error in inverse (dgetri)'
+  endif
+  deallocate(ipiv,work)
+end
+
+subroutine get_pseudo_inverse(A,LDA,m,n,C,LDC)
   implicit none
   BEGIN_DOC
   ! Find C = A^-1
   END_DOC
-  integer, intent(in)            :: m,n, LDA
+  integer, intent(in)            :: m,n, LDA, LDC
   double precision, intent(in)   :: A(LDA,n)
-  double precision, intent(out)  :: C(n,m)
+  double precision, intent(out)  :: C(LDC,m)
   
   double precision, allocatable  :: U(:,:), D(:), Vt(:,:), work(:), A_tmp(:,:)
   integer                        :: info, lwork
@@ -292,17 +320,17 @@ subroutine get_pseudo_inverse(A,m,n,C,LDA)
     print *,  info, ': SVD failed'
     stop
   endif
-  lwork = work(1)
+  lwork = int(work(1))
   deallocate(work)
   allocate(work(lwork))
   call dgesvd('S','A', m, n, A_tmp, m,D,U,m,Vt,n,work,lwork,info)
   if (info /= 0) then
-    print *,  info, ': SVD failed'
+    print *,  info, ':: SVD failed'
     stop 1
   endif
   
   do i=1,n
-    if (abs(D(i)) > 1.d-6) then
+    if (D(i)/D(1) > 1.d-10) then
       D(i) = 1.d0/D(i)
     else
       D(i) = 0.d0
@@ -313,7 +341,7 @@ subroutine get_pseudo_inverse(A,m,n,C,LDA)
   do i=1,m
     do j=1,n
       do k=1,n
-        C(j,i) += U(i,k) * D(k) * Vt(k,j)
+        C(j,i) = C(j,i) + U(i,k) * D(k) * Vt(k,j)
       enddo
     enddo
   enddo
@@ -333,7 +361,7 @@ subroutine find_rotation(A,LDA,B,m,C,n)
   
   double precision, allocatable  :: A_inv(:,:)
   allocate(A_inv(LDA,n))
-  call get_pseudo_inverse(A,m,n,A_inv,LDA)
+  call get_pseudo_inverse(A,LDA,m,n,A_inv,LDA)
   
   integer                        :: i,j,k
   call dgemm('N','N',n,n,m,1.d0,A_inv,n,B,LDA,0.d0,C,n)

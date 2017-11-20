@@ -1,3 +1,10 @@
+## IMPORTANT
+
+If you have problems upgrading to the current version, consider re-installing everything from scratch including the OCaml compiler.
+To do this, you will have to remove the `quantum_package` directory **and** the `$HOME/.opam` directory as well.
+
+
+
 ![QP](https://raw.githubusercontent.com/LCPQ/quantum_package/master/data/qp.png)     
 [![Build Status](https://travis-ci.org/LCPQ/quantum_package.svg?branch=master)](https://travis-ci.org/LCPQ/quantum_package)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/LCPQ/quantum_package?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -5,7 +12,7 @@
 Set of quantum chemistry programs and libraries. 
 (under GNU GENERAL PUBLIC LICENSE v2)
 
-For more information, you can visit the [wiki of the project](http://github.com/LCPQ/quantum_package/wiki>), or below for the installation instructions.
+For more information, you can visit the [wiki of the project](http://github.com/LCPQ/quantum_package/wiki), or below for the installation instructions.
 
 
 
@@ -32,26 +39,20 @@ Demo
 
 ### 1) Configure
 
-    $ ./configure <config_file> (--production | --development)
-
-For example you can type `./configure config/gfortran.cfg --production`
+    $ ./configure <config_file> 
+    
+For example you can type `./configure config/gfortran.cfg`
 
 This command has two purposes :
 
  - Download and install all the requirements.
    Installing OCaml and the Core library may take some time (up to 20min on an old machine).
  - Create the file which contains all the dependencies for the binaries.  
-   It's not a Makefile, but a Ninja file (so don't type `make` is hopeless, type `ninja` instead)
+   It's not a Makefile, but a Ninja file (so don't type `make` it's hopeless, type `ninja` instead)
 
-####Compilation Flags (`<config_file>`)
+#### Compilation Flags (`<config_file>`)
 
 `<config_file>` is the path to the file which contains all the compilation flags (optimization flags, Lapack libary, etc). There are two example configure files in  ``$QP_ROOT/config`` : ``ifort.cfg`` and ``gfortran.cfg``.  You can copy these files to create a new file adapted to your architecture. 
-
-#### What utilization of the code will you do?
-
-* If you only want the binaries (for production workflow) use the flag
-  `--production`. It compiles faster. 
-* Else if you are a developer and you want to be able to compile specific modules use: `--development`. It will create the `build.ninja` in each module.
 
 ### 2) Load environment variables
  
@@ -75,24 +76,16 @@ Usage:
 
 ### 3) Compiling the Fortran
 
-Just type `ninja` if you are in `$QP_ROOT` (or `ninja -f $QP_ROOT/build.ninja` elsewhere). The compilation will take approximately 3 min.
-
-If you have set the `--developement` flag you can go in any module directory and run `ninja` to build only this particular module. You can type `ninja all` in a module to compile all the submodules.
-
-
-### 4) Compiling the OCaml
-
-    make -C $QP_ROOT/ocaml
+Just type `ninja` if you are in `$QP_ROOT`. The compilation will take approximately 3 min.
 
 ### 5) Testing if all is ok
 
     cd tests ; ./run_tests.sh
 
 
-
 # Note on EZFIO.cfg
 
-##Format specification :
+## Format specification:
 
 ```
 Required:
@@ -119,7 +112,7 @@ Optional:
                               (by default is <module_lower>)
 ```
 
-##Example of EZFIO.cfg:
+## Example of EZFIO.cfg:
 
 ```
 [thresh_SCF]
@@ -135,19 +128,23 @@ doc: Calculated HF energy
 interface: ezfio
 ```
 
-#FAQ
+# FAQ
+
+### My hartree-Fock segfault !
+
+A old version of Lapack have a bug. Just relax your convergence criterium
+
 
 ### Error: ezfio_* is already defined.
 
 #### Why ?
 
-You have two or more ezfio configuration files for the same variable. Check files in `$QP_ROOT/install/EZFIO/config/`
+You have two or more ezfio configuration files for the same variable. Check files in `$QP_ROOT/install/EZFIO/config/` and the all the `EZFIO.cfg`.
 
 #### Fix
 
     - rm $QP_ROOT/install/EZFIO/config/*
     - ninja 
-    
 
 ### Error: Seg Fault (139)
 
@@ -160,7 +157,7 @@ Program exited with code 139.
 
 It's caused when we call the DGEMM routine of LAPACK. 
 
-##### Fix
+#### Fix
 
 Set `ulimit -s unlimited`, before runing `qp_run`. It seems to fix the problem.
 

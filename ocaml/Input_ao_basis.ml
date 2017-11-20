@@ -1,6 +1,6 @@
 open Qptypes;;
 open Qputils;;
-open Core.Std;;
+open Core;;
 
 module Ao_basis : sig
   type t = 
@@ -13,7 +13,7 @@ module Ao_basis : sig
       ao_coef         : AO_coef.t array;
       ao_expo         : AO_expo.t array;
       ao_cartesian    : bool;
-    } with sexp
+    } [@@deriving sexp]
   ;;
   val read : unit -> t option
   val to_string : t -> string
@@ -32,7 +32,7 @@ end = struct
       ao_coef         : AO_coef.t array;
       ao_expo         : AO_expo.t array;
       ao_cartesian    : bool;
-    } with sexp
+    } [@@deriving sexp]
   ;;
 
   let get_default = Qpackage.get_ezfio_default "ao_basis";;
@@ -112,8 +112,8 @@ end = struct
         let s = Symmetry.Xyz.to_symmetry b.ao_power.(i) in
         let ao_prim_num = AO_prim_number.to_int b.ao_prim_num.(i) in
         let prims = List.init ao_prim_num ~f:(fun j ->
-          let prim = { Primitive.sym  = s ;
-                       Primitive.expo = b.ao_expo.(ao_num*j+i)
+          let prim = { GaussianPrimitive.sym  = s ;
+                       GaussianPrimitive.expo = b.ao_expo.(ao_num*j+i)
                      }
           in
           let coef = b.ao_coef.(ao_num*j+i) in

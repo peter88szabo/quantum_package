@@ -1,6 +1,6 @@
 open Qputils
 open Qptypes
-open Core.Std
+open Core
 
 let spec =
   let open Command.Spec in
@@ -21,6 +21,9 @@ let spec =
      ~doc:" Compute AOs in the Cartesian basis set (6d, 10f, ...)"
   +> anon ("(xyz_file|zmt_file)" %: file )
 
+type element =
+| Element of Element.t
+| Int_elem of (Nucl_number.t * Element.t)
 
 (** Handle dummy atoms placed on bonds *)
 let dummy_centers ~threshold ~molecule ~nuclei =
@@ -115,17 +118,14 @@ let run ?o b c d m p cart xyz_file =
   (* Open basis set channels *)
   let basis_channel element =
     let key =
-      Element.to_string element
+      match element with
+      | Element e -> Element.to_string e
+      | Int_elem (i,e) -> Printf.sprintf "%d,%s" (Nucl_number.to_int i)  (Element.to_string e)
     in
     match Hashtbl.find basis_table key with
     | Some in_channel -> 
         in_channel
-    | None -> 
-         let msg = 
-           Printf.sprintf "%s is not defined in basis %s.%!"
-           (Element.to_long_string element) b ;
-         in
-         failwith msg
+    | None -> raise Not_found
   in
   
   let temp_filename =
@@ -189,12 +189,21 @@ let run ?o b c d m p cart xyz_file =
       | Some (key, basis) -> (*Aux basis *)
         begin
           let elem  = 
-            Element.of_string key
+            try
+              Element (Element.of_string key)
+            with Element.ElementError _ ->
+              let result = 
+                match (String.split ~on:',' key) with
+                | i :: k :: [] -> (Nucl_number.of_int @@ int_of_string i, Element.of_string k)
+                | _ -> failwith "Expected format is int,Element:basis"
+              in Int_elem result
           and basis =
             String.lowercase basis
           in
           let key = 
-             Element.to_string elem
+             match elem with
+             | Element e -> Element.to_string e
+             | Int_elem (i,e) -> Printf.sprintf "%d,%s" (Nucl_number.to_int i) (Element.to_string e)
           in
           let new_channel =
             fetch_channel basis
@@ -202,7 +211,13 @@ let run ?o b c d m p cart xyz_file =
           begin
             match Hashtbl.add basis_table ~key:key ~data:new_channel with
             | `Ok -> ()
-            | `Duplicate -> failwith ("Duplicate definition of basis for "^(Element.to_long_string elem))
+            | `Duplicate ->
+              let e = 
+                match elem with
+                | Element e -> e
+                | Int_elem (_,e) -> e
+              in
+              failwith ("Duplicate definition of basis for "^(Element.to_long_string e))
           end
        end
     end;
@@ -405,7 +420,7 @@ let run ?o b c d m p cart xyz_file =
           let x = 
             List.fold x.Pseudo.non_local ~init:0 ~f:(fun accu (x,_) ->
               let x = 
-                Positive_int.to_int x.Pseudo.Primitive_non_local.proj
+                Positive_int.to_int x.Pseudo.GaussianPrimitive_non_local.proj
               in
               if (x > accu) then x
               else accu
@@ -420,7 +435,7 @@ let run ?o b c d m p cart xyz_file =
          Array.init (lmax+1) ~f:(fun i->
            List.map pseudo ~f:(fun x -> 
              List.filter x.Pseudo.non_local ~f:(fun (y,_) -> 
-               (Positive_int.to_int y.Pseudo.Primitive_non_local.proj) = i)
+               (Positive_int.to_int y.Pseudo.GaussianPrimitive_non_local.proj) = i)
              |> List.length )
            |> List.fold ~init:0 ~f:(fun accu x ->
              if accu > x then accu else x)
@@ -443,8 +458,8 @@ let run ?o b c d m p cart xyz_file =
           List.iteri x.Pseudo.local ~f:(fun i (y,c) ->
             tmp_array_v_k.(i).(j)  <- AO_coef.to_float c;
             let y, z =
-              AO_expo.to_float y.Pseudo.Primitive_local.expo, 
-              R_power.to_int y.Pseudo.Primitive_local.r_power 
+              AO_expo.to_float y.Pseudo.GaussianPrimitive_local.expo, 
+              R_power.to_int y.Pseudo.GaussianPrimitive_local.r_power 
             in
             tmp_array_dz_k.(i).(j) <- y;
             tmp_array_n_k.(i).(j)  <- z;
@@ -479,9 +494,9 @@ let run ?o b c d m p cart xyz_file =
           in
           List.iter x.Pseudo.non_local ~f:(fun (y,c) -> 
             let k, y, z =
-              Positive_int.to_int y.Pseudo.Primitive_non_local.proj,
-              AO_expo.to_float y.Pseudo.Primitive_non_local.expo,
-              R_power.to_int y.Pseudo.Primitive_non_local.r_power
+              Positive_int.to_int y.Pseudo.GaussianPrimitive_non_local.proj,
+              AO_expo.to_float y.Pseudo.GaussianPrimitive_non_local.expo,
+              R_power.to_int y.Pseudo.GaussianPrimitive_non_local.r_power
             in
             let i = 
               last_idx.(k) 
@@ -537,7 +552,20 @@ let run ?o b c d m p cart xyz_file =
               | Element.X -> Element.H
               | e -> e
             in
-            Basis.read_element (basis_channel x.Atom.element) i e
+            let key =
+              Int_elem (i,x.Atom.element)
+            in
+            try
+              Basis.read_element (basis_channel key) i e
+            with Not_found ->
+              let key =
+                Element x.Atom.element
+              in
+              try
+                Basis.read_element (basis_channel key) i e
+              with Not_found ->
+                failwith (Printf.sprintf "Basis not found for atom %d (%s)" (Nucl_number.to_int i)
+                 (Element.to_string x.Atom.element) )
           with
           | End_of_file -> failwith
                 ("Element "^(Element.to_string x.Atom.element)^" not found in basis set.")
@@ -574,7 +602,7 @@ let run ?o b c d m p cart xyz_file =
               List.map x.Gto.lc ~f:(fun (_,coef) -> AO_coef.to_float coef) )
             | `Expos -> List.map gtos ~f:(fun x->
               List.map x.Gto.lc ~f:(fun (prim,_) -> AO_expo.to_float
-              prim.Primitive.expo) )
+              prim.GaussianPrimitive.expo) )
             end
           in
           let rec get_n n accu = function
@@ -647,6 +675,7 @@ atoms are taken from the same basis set, otherwise specific elements can be
 defined as follows:
 
  -b \"cc-pcvdz | H:cc-pvdz | C:6-31g\"
+ -b \"cc-pvtz | 1,H:sto-3g | 3,H:6-31g\"
 
 If a file with the same name as the basis set exists, this file will be read.
 Otherwise, the basis set is obtained from the database.
