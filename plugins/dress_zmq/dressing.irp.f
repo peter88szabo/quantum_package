@@ -86,7 +86,7 @@ BEGIN_PROVIDER [ double precision, delta_ij, (N_states,N_det,2) ]
 !  else
 !    errr = 1d-4
 !  end if
-  relative_error = 1.d-3
+  relative_error = 1.d-4
   call write_double(6,relative_error,"Convergence of the stochastic algorithm")
 
   call ZMQ_dress(E_CI_before, dress, del, del_s2, abs(relative_error))

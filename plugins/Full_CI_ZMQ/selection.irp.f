@@ -253,6 +253,7 @@ subroutine get_m0(gen, phasemask, bannedOrb, vect, mask, h, p, sp, coefs)
   deallocate(lbanned)
 end 
 
+
 subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_diag_tmp,E0,pt2,buf,subset)
   use bitmasks
   use selection_types
@@ -292,10 +293,17 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   
   
   do k=1,N_int
-    hole    (k,1) = iand(psi_det_generators(k,1,i_generator), hole_mask(k,1))
-    hole    (k,2) = iand(psi_det_generators(k,2,i_generator), hole_mask(k,2))
-    particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), particle_mask(k,1))
-    particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), particle_mask(k,2))
+    !if(buf%N > 0) then
+    !  hole    (k,1) = iand(psi_det_generators(k,1,i_generator), hole_mask(k,1))
+    !  hole    (k,2) = iand(psi_det_generators(k,2,i_generator), hole_mask(k,2))
+    !  particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), particle_mask(k,1))
+     ! particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), particle_mask(k,2))
+    !else
+      hole    (k,1) = iand(psi_det_generators(k,1,i_generator), full_ijkl_bitmask(k))
+      hole    (k,2) = iand(psi_det_generators(k,2,i_generator), full_ijkl_bitmask(k))
+      particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), full_ijkl_bitmask(k))
+      particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k))
+    !end if
   enddo
   
   
@@ -598,7 +606,6 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
   
   logical, external :: detEq
   
-  
   if(sp == 3) then
     s1 = 1
     s2 = 2
@@ -616,15 +623,13 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
     do p2=ib,mo_tot_num
       if(bannedOrb(p2, s2)) cycle
       if(banned(p1,p2)) cycle
+
       if( sum(abs(mat(1:N_states, p1, p2))) == 0d0) cycle
       call apply_particles(mask, s1, p1, s2, p2, det, ok, N_int)
       
       Hii = diag_H_mat_elem_fock(psi_det_generators(1,1,i_generator),det,fock_diag_tmp,N_int)
       min_e_pert = 0d0
       
-!     double precision :: hij       
-!     call i_h_j(psi_det_generators(1,1,i_generator), det, N_int, hij)
-
       do istate=1,N_states
         delta_E = E0(istate) - Hii
         val = mat(istate, p1, p2) + mat(istate, p1, p2) 
@@ -635,7 +640,6 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
         e_pert = 0.5d0 * (tmp - delta_E)
         pt2(istate) = pt2(istate) + e_pert
         min_e_pert = min(e_pert,min_e_pert)
-!        ci(istate) = e_pert / hij
       end do
       
       if(min_e_pert <= buf%mini) then

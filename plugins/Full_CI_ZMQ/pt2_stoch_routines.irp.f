@@ -342,7 +342,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
       endif
     end if
   end do pullLoop
-
+  
   E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
   prop = ((1d0 - dfloat(comb_teeth - tooth + 1) * comb_step) - pt2_cweight(first_det_of_teeth(tooth)-1))
   prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))

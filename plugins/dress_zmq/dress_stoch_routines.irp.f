@@ -286,7 +286,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
 
       call wall_time(time)
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 5)  .or. total_computed == N_det_generators) then
+      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30)  .or. total_computed == N_det_generators) then
         ! Termination
         print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
