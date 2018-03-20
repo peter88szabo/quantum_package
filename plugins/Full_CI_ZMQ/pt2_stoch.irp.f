@@ -25,8 +25,8 @@ subroutine run
   E_CI_before = pt2_E0_denominator(1) + nuclear_repulsion
   threshold_selectors = 1.d0
   threshold_generators = 1d0 
-  relative_error = 1.d-9
-  absolute_error = 1.d-9
+  relative_error = 1.d-5
+  absolute_error = 1.d-5
   call ZMQ_pt2(E_CI_before, pt2, relative_error, absolute_error, eqt)
   print *,  'Final step'
   print *,  'N_det    = ', N_det
