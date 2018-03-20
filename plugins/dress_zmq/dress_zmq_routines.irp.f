@@ -5,7 +5,7 @@ subroutine dress_zmq()
 
   read_wf = .True.
   SOFT_TOUCH read_wf
-  call set_generators_bitmasks_as_holes_and_particles
+  
   if (.True.) then
     integer :: i,j
     do j=1,N_states

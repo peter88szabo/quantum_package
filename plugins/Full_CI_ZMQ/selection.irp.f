@@ -290,20 +290,13 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
 
   monoAdo = .true.
   monoBdo = .true.
-  
+
   
   do k=1,N_int
-    !if(buf%N > 0) then
-    !  hole    (k,1) = iand(psi_det_generators(k,1,i_generator), hole_mask(k,1))
-    !  hole    (k,2) = iand(psi_det_generators(k,2,i_generator), hole_mask(k,2))
-    !  particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), particle_mask(k,1))
-     ! particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), particle_mask(k,2))
-    !else
-      hole    (k,1) = iand(psi_det_generators(k,1,i_generator), full_ijkl_bitmask(k))
-      hole    (k,2) = iand(psi_det_generators(k,2,i_generator), full_ijkl_bitmask(k))
-      particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), full_ijkl_bitmask(k))
-      particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k))
-    !end if
+    hole    (k,1) = iand(psi_det_generators(k,1,i_generator), hole_mask(k,1))
+    hole    (k,2) = iand(psi_det_generators(k,2,i_generator), hole_mask(k,2))
+    particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), particle_mask(k,1))
+    particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), particle_mask(k,2))
   enddo
   
   

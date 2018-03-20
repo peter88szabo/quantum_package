@@ -74,26 +74,19 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
     
   monoAdo = .true.
   monoBdo = .true.
+  
 
   do k=1,N_int
-    !hole    (k,1) = iand(psi_det_generators(k,1,i_generator), generators_bitmask(k,1,s_hole,bitmask_index))
-    !hole    (k,2) = iand(psi_det_generators(k,2,i_generator), generators_bitmask(k,2,s_hole,bitmask_index))
-    !particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), generators_bitmask(k,1,s_part,bitmask_index))
-    !particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), generators_bitmask(k,2,s_part,bitmask_index))
-    hole    (k,1) = iand(psi_det_generators(k,1,i_generator), full_ijkl_bitmask(k))
-    hole    (k,2) = iand(psi_det_generators(k,2,i_generator), full_ijkl_bitmask(k))
-    particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), full_ijkl_bitmask(k))
-    particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k))
-    
+    hole    (k,1) = iand(psi_det_generators(k,1,i_generator), generators_bitmask(k,1,s_hole,bitmask_index))
+    hole    (k,2) = iand(psi_det_generators(k,2,i_generator), generators_bitmask(k,2,s_hole,bitmask_index))
+    particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), generators_bitmask(k,1,s_part,bitmask_index))
+    particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), generators_bitmask(k,2,s_part,bitmask_index))
+    !hole    (k,1) = iand(psi_det_generators(k,1,i_generator), full_ijkl_bitmask(k))
+    !hole    (k,2) = iand(psi_det_generators(k,2,i_generator), full_ijkl_bitmask(k))
+    !particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), full_ijkl_bitmask(k))
+    !particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k))
+ 
   enddo
-  
-  !if(i_generator == 34) then
-  !  call debug_det(psi_det_generators(1,1,34), N_int)
-  !  call debug_det(generators_bitmask(1,1,s_part,bitmask_index), N_int)
-  !  call debug_det(particle, N_int)
-  !  print *, "dddddddddddd"
-  !  stop
-  !end if
 
   integer                        :: N_holes(2), N_particles(2)
   integer                        :: hole_list(N_int*bit_kind_size,2)

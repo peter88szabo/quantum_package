@@ -1,9 +1,10 @@
 
-program mrcc_sto
+program shifted_bk
   implicit none
   BEGIN_DOC
 ! TODO
   END_DOC
+
   call diagonalize_CI()
   call dress_zmq()
 end
@@ -64,7 +65,7 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
 
   do i=1,Nstates
     de = E0_denominator(i) - haa
-    if(DABS(de) < 1D-2) cycle
+    if(DABS(de) < 1D-5) cycle
 
     c_alpha = a_h_psi(i) / de
 
