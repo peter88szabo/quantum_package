@@ -50,7 +50,6 @@ subroutine run_dress_slave(thread,iproc,energy)
   end do
   do
     call get_task_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id, task)
-    
     if(task_id /= 0) then
       read (task,*) subset, i_generator
       delta_ij_loc = 0d0

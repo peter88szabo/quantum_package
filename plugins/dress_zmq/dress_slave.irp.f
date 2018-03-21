@@ -24,7 +24,7 @@ subroutine run_wf
   double precision :: energy(N_states_diag)
   character*(64) :: states(1)
   integer :: rc, i
-  
+
   call provide_everything
   
   zmq_context = f77_zmq_ctx_new ()
@@ -33,14 +33,12 @@ subroutine run_wf
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
 
   do
-
     call wait_for_states(states,zmq_state,1)
-
-    if(trim(zmq_state) == 'Stopped') then
+    if(zmq_state(:7) == 'Stopped') then
 
       exit
 
-    else if (trim(zmq_state) == 'dress') then
+    else if (zmq_state(:5) == 'dress') then
 
       ! Selection
       ! ---------
@@ -55,7 +53,7 @@ subroutine run_wf
 
       !$OMP PARALLEL PRIVATE(i)
       i = omp_get_thread_num()
-      call dress_slave_tcp(i, energy)
+      call dress_slave_tcp(i+1, energy)
       !$OMP END PARALLEL
       print *,  'dress done'
 
