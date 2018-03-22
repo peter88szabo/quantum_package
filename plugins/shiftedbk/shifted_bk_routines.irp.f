@@ -1,15 +1,54 @@
-
+use selection_types
 
  BEGIN_PROVIDER [ double precision, fock_diag_tmp_, (2,mo_tot_num+1,Nproc) ]
 &BEGIN_PROVIDER [ integer, current_generator_, (Nproc) ]
 &BEGIN_PROVIDER [ double precision, a_h_i, (N_det, Nproc) ]
 &BEGIN_PROVIDER [ double precision, a_s2_i, (N_det, Nproc) ]
+&BEGIN_PROVIDER [ type(selection_buffer), sb, (Nproc) ]
+&BEGIN_PROVIDER [ double precision, N_det_increase_factor ]
   implicit none
+  integer :: i
+  integer :: n_det_add
+
+  N_det_increase_factor = 1d0
+
   current_generator_(:) = 0
+  do i=1,Nproc
+    n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
+    call create_selection_buffer(n_det_add, n_det_add*2, sb(i))
+  end do
   a_h_i = 0d0
   a_s2_i = 0d0
  END_PROVIDER
 
+
+
+subroutine delta_ij_done()
+  implicit none
+  integer :: i, n_det_add
+  
+  call sort_selection_buffer(sb(1))
+
+  do i=2,Nproc
+    call sort_selection_buffer(sb(i))
+    call merge_selection_buffers(sb(i), sb(1))
+  end do
+  
+  call sort_selection_buffer(sb(1))
+
+  call fill_H_apply_buffer_no_selection(sb(1)%cur,sb(1)%det,N_int,0) 
+  call copy_H_apply_buffer_to_wf()
+  if (s2_eig.or.(N_states > 1) ) then
+    call make_s2_eigenfunction
+  endif
+  !call save_wavefunction
+  n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
+  do i=1,Nproc
+    call delete_selection_buffer(sb(i))
+    call create_selection_buffer(n_det_add, n_det_add*2, sb(i))
+  end do
+  !delta_ij = 0d0
+end subroutine
 
 
 subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minilist, det_minilist, n_minilist, alpha, iproc)
@@ -31,8 +70,8 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
   double precision, external :: diag_H_mat_elem_fock
   integer                        :: i,j,k,l,m, l_sd
   double precision :: hdress, sdress
-  double precision :: de, a_h_psi(Nstates), c_alpha
-  
+  double precision :: de, a_h_psi(Nstates), c_alpha, contrib
+
 
   a_h_psi = 0d0
   
@@ -52,13 +91,15 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
     end do
   end do
 
+  contrib = 0d0
 
   do i=1,Nstates
     de = E0_denominator(i) - haa
     if(DABS(de) < 1D-5) cycle
 
     c_alpha = a_h_psi(i) / de
-
+    contrib = min(contrib, c_alpha * a_h_psi(i))
+    
     do l_sd=1,n_minilist
       hdress = c_alpha * a_h_i(l_sd, iproc)
       sdress = c_alpha * a_s2_i(l_sd, iproc)
@@ -66,6 +107,9 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
       delta_ij_loc(i, minilist(l_sd), 2) += sdress
     end do
   end do
+
+  call add_to_selection_buffer(sb(iproc), alpha, contrib)
+
 end subroutine
 
 
