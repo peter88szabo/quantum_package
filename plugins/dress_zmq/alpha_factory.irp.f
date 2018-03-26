@@ -84,8 +84,7 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
     !hole    (k,1) = iand(psi_det_generators(k,1,i_generator), full_ijkl_bitmask(k))
     !hole    (k,2) = iand(psi_det_generators(k,2,i_generator), full_ijkl_bitmask(k))
     !particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), full_ijkl_bitmask(k))
-    !particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k))
- 
+    !particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k)) 
   enddo
 
   integer                        :: N_holes(2), N_particles(2)

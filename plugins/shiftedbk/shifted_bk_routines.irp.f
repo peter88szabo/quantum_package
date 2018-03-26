@@ -9,12 +9,12 @@ use selection_types
   implicit none
   integer :: i
   integer :: n_det_add
-
+  
   N_det_increase_factor = 1d0
 
   current_generator_(:) = 0
+  n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
   do i=1,Nproc
-    n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
     call create_selection_buffer(n_det_add, n_det_add*2, sb(i))
   end do
   a_h_i = 0d0
@@ -26,11 +26,13 @@ use selection_types
 subroutine delta_ij_done()
   use bitmasks
   implicit none
-  integer :: i, n_det_add
+  integer :: i, n_det_add, old_det_gen
+  integer(bit_kind), allocatable :: old_generators(:,:,:)
   
-  if(N_det /= N_det_delta_ij) stop "N_det /= N_det_delta_ij"
-
-
+  allocate(old_generators(N_int, 2, N_det_generators))
+  old_generators(:,:,:) = psi_det_generators(:,:,:N_det_generators)
+  old_det_gen = N_det_generators
+ 
   call sort_selection_buffer(sb(1))
 
   do i=2,Nproc
@@ -39,28 +41,19 @@ subroutine delta_ij_done()
   end do
   
   call sort_selection_buffer(sb(1))
-
-  call undress_with_alpha(sb(1)%det, sb(1)%cur)
   
   call fill_H_apply_buffer_no_selection(sb(1)%cur,sb(1)%det,N_int,0) 
   call copy_H_apply_buffer_to_wf()
-  if(N_det == N_det_delta_ij) stop "N_det == N_det_delta_ij"
+
   if (s2_eig.or.(N_states > 1) ) then
-    print *, "***"
-    print *, "*** WARNING - SHIFTED_BK currently does not support s2_eig ***"
-    print *, "***"
-    !call make_s2_eigenfunction
+    call make_s2_eigenfunction
   endif
-  !call save_wavefunction
-  n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
-  do i=1,Nproc
-    call delete_selection_buffer(sb(i))
-    call create_selection_buffer(n_det_add, n_det_add*2, sb(i))
-  end do
+  call undress_with_alpha(old_generators, old_det_gen, psi_det(1,1,N_det_delta_ij+1), N_det-N_det_delta_ij)
+  call save_wavefunction
 end subroutine
 
 
-subroutine undress_with_alpha(alpha, n_alpha)
+subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
   use bitmasks
   implicit none
 
@@ -69,20 +62,46 @@ subroutine undress_with_alpha(alpha, n_alpha)
   integer, allocatable :: minilist(:)
   integer(bit_kind), allocatable :: det_minilist(:,:,:)
   double precision, allocatable :: delta_ij_loc(:,:,:,:)
-  integer :: i, j, k, ex, n_minilist, iproc
-  double precision :: haa, contrib
+  integer :: exc(0:2,2,2), h1, h2, p1, p2, s1, s2
+  integer :: i, j, k, ex, n_minilist, iproc, degree
+  double precision :: haa, contrib, phase
+  logical :: ok
   integer, external :: omp_get_thread_num
-  allocate(minilist(N_det), det_minilist(N_int, 2, N_det), delta_ij_loc(N_states, N_det, 2, Nproc))
+ 
+  integer,intent(in) :: old_det_gen
+  integer(bit_kind), intent(in) :: old_generators(N_int, 2, old_det_gen)
+  
+  allocate(minilist(N_det_delta_ij), det_minilist(N_int, 2, N_det_delta_ij), delta_ij_loc(N_states, N_det_delta_ij, 2, Nproc))
+  
   delta_ij_loc = 0d0
-  print *, "UNDRESSING..."
-
+  
   !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(STATIC,1) PRIVATE(i, j, iproc, n_minilist, ex) &
-  !$OMP PRIVATE(det_minilist, minilist, haa, contrib)
-  do i=1, n_alpha
+  !$OMP PRIVATE(det_minilist, minilist, haa, contrib)  &
+  !$OMP PRIVATE(exc, h1, h2, p1, p2, s1, s2, phase, degree, ok)
+  do i=n_alpha,1,-1
     iproc = omp_get_thread_num()+1
     if(mod(i,10000) == 0) print *, "UNDRESSING", i, "/", n_alpha, iproc
     n_minilist = 0
-    do j=1, N_det
+    ok = .false.
+    
+    do j=1, old_det_gen
+      call get_excitation_degree(alpha(1,1,i), old_generators(1,1,j), ex, N_int)
+      if(ex <= 2) then
+        call get_excitation(old_generators(1,1,j), alpha(1,1,i), exc,degree,phase,N_int)
+        call decode_exc(exc,degree,h1,p1,h2,p2,s1,s2)
+        ok = (mo_class(h1)(1:1) == 'A' .or. mo_class(h1)(1:1) == 'I') .and. &
+           (mo_class(p1)(1:1) == 'A' .or. mo_class(p1)(1:1) == 'V') 
+        if(ok .and. degree == 2) then
+             ok = (mo_class(h2)(1:1) == 'A' .or. mo_class(h2)(1:1) == 'I') .and. &
+             (mo_class(p2)(1:1) == 'A' .or. mo_class(p2)(1:1) == 'V') 
+        end if
+        if(ok) exit
+      end if
+    end do
+    
+    if(.not. ok) cycle
+
+    do j=1, N_det_delta_ij
       call get_excitation_degree(alpha(1,1,i), psi_det(1,1,j), ex, N_int)
       if(ex <= 2) then
         n_minilist += 1
@@ -90,16 +109,15 @@ subroutine undress_with_alpha(alpha, n_alpha)
         minilist(n_minilist) = j
       end if
     end do
-    if(n_minilist > 0) then
-      call i_h_j(alpha(1,1,i), alpha(1,1,i), N_int, haa)
-      call dress_with_alpha_(N_states, N_det, N_int, delta_ij_loc(1,1,1,iproc),  &
-          minilist, det_minilist, n_minilist, alpha(1,1,i), haa, contrib, iproc)
-    end if
+    call i_h_j(alpha(1,1,i), alpha(1,1,i), N_int, haa)
+    call dress_with_alpha_(N_states, N_det_delta_ij, N_int, delta_ij_loc(1,1,1,iproc),  &
+        minilist, det_minilist, n_minilist, alpha(1,1,i), haa, contrib, iproc)
   end do
   !$OMP END PARALLEL DO
   
-  do i=Nproc,1,-1
+  do i=1,Nproc
     delta_ij_tmp(:,:,:) -= delta_ij_loc(:,:,:,i)
+    !print *, "DELTA_IJ_LOC", delta_ij_loc(:,2:5,2,i)
   end do
 end subroutine
 
@@ -118,7 +136,7 @@ subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minili
   integer, intent(in)             :: Nint, Ndet, Nstates, n_minilist, iproc
   integer(bit_kind), intent(in)   :: alpha(Nint,2), det_minilist(Nint, 2, n_minilist)
   integer,intent(in)              :: minilist(n_minilist)
-  double precision, intent(inout) :: delta_ij_loc(Nstates,N_det,2)
+  double precision, intent(inout) :: delta_ij_loc(Nstates,Ndet,2)
   double precision, intent(out)   :: contrib
   double precision, intent(in)    :: haa
   double precision :: hij, sij
