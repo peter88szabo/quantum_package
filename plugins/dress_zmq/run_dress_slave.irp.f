@@ -74,15 +74,30 @@ subroutine push_dress_results(zmq_socket_push, ind, delta_loc, task_id)
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_push
   double precision, intent(in)   :: delta_loc(N_states, N_det, 2)
   integer, intent(in) :: ind, task_id
-  integer :: rc, i
-  
+  integer :: rc, i, j, felem
+
+  felem = 1
+
+  dloop : do i=1, N_det
+    do j=1,N_states
+      if(delta_loc(j,i,1) /= 0d0 .or. delta_loc(j,i,2) /= 0d0) then
+        felem = i
+        exit dloop
+      end if
+    end do
+  end do dloop
 
   rc = f77_zmq_send( zmq_socket_push, ind, 4, ZMQ_SNDMORE)
   if(rc /= 4) stop "push"
+ 
+  rc = f77_zmq_send( zmq_socket_push, felem, 4, ZMQ_SNDMORE)
+  if(rc /= 4) stop "push"
+  
+  rc = f77_zmq_send( zmq_socket_push, delta_loc(1,felem,1), 8*N_states*(N_det-felem+1), ZMQ_SNDMORE)
+  if(rc /= 8*N_states*(N_det+1-felem)) stop "push"
 
-
-  rc = f77_zmq_send( zmq_socket_push, delta_loc, 8*N_states*N_det*2, ZMQ_SNDMORE)
-  if(rc /= 8*N_states*N_det*2) stop "push"
+  rc = f77_zmq_send( zmq_socket_push, delta_loc(1,felem,2), 8*N_states*(N_det-felem+1), ZMQ_SNDMORE)
+  if(rc /= 8*N_states*(N_det+1-felem)) stop "push"
   
   rc = f77_zmq_send( zmq_socket_push, task_id, 4, 0)
   if(rc /= 4) stop "push"
@@ -97,11 +112,12 @@ IRP_ENDIF
 end subroutine
 
 
-subroutine pull_dress_results(zmq_socket_pull, ind, delta_loc, task_id)
+subroutine pull_dress_results(zmq_socket_pull, ind, delta_loc, task_id, felem)
   use f77_zmq
   implicit none
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
   double precision, intent(inout) :: delta_loc(N_states, N_det, 2)
+  integer, intent(out) :: felem
   integer, intent(out) :: ind
   integer, intent(out) :: task_id
   integer :: rc, i
@@ -110,8 +126,16 @@ subroutine pull_dress_results(zmq_socket_pull, ind, delta_loc, task_id)
   rc = f77_zmq_recv( zmq_socket_pull, ind, 4, 0)
   if(rc /= 4) stop "pull"
   
-  rc = f77_zmq_recv( zmq_socket_pull, delta_loc, N_states*8*N_det*2, 0)
-  if(rc /= 8*N_states*N_det*2) stop "pull"
+  rc = f77_zmq_recv( zmq_socket_pull, felem, 4, 0)
+  if(rc /= 4) stop "pull"
+  
+  delta_loc(:,:felem,:) = 0d0
+
+  rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,felem,1), N_states*8*(N_det+1-felem), 0)
+  if(rc /= 8*N_states*(N_det+1-felem)) stop "pull"
+  
+  rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,felem,2), N_states*8*(N_det+1-felem), 0)
+  if(rc /= 8*N_states*(N_det+1-felem)) stop "pull"
 
   rc = f77_zmq_recv( zmq_socket_pull, task_id, 4, 0)
   if(rc /= 4) stop "pull"

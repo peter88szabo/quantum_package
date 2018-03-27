@@ -75,7 +75,7 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
   
   delta_ij_loc = 0d0
   
-  !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(STATIC,1) PRIVATE(i, j, iproc, n_minilist, ex) &
+  !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(STATIC) PRIVATE(i, j, iproc, n_minilist, ex) &
   !$OMP PRIVATE(det_minilist, minilist, haa, contrib)  &
   !$OMP PRIVATE(exc, h1, h2, p1, p2, s1, s2, phase, degree, ok)
   do i=n_alpha,1,-1
@@ -115,10 +115,11 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
   end do
   !$OMP END PARALLEL DO
   
-  do i=1,Nproc
-    delta_ij_tmp(:,:,:) -= delta_ij_loc(:,:,:,i)
-    !print *, "DELTA_IJ_LOC", delta_ij_loc(:,2:5,2,i)
+  do i=2,Nproc
+    delta_ij_loc(:,:,:,1) += delta_ij_loc(:,:,:,i)
   end do
+  
+  delta_ij_tmp(:,:,:) -= delta_ij_loc(:,:,:,1)
 end subroutine
 
 

@@ -134,6 +134,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   implicit none
 
   
+  integer, parameter :: delta_loc_N = 2
 
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
   integer, intent(in)            :: istate
@@ -144,7 +145,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
   double precision, intent(out)  :: delta(N_states, N_det)
   double precision, intent(out)  :: delta_s2(N_states, N_det)
-  double precision, allocatable  :: delta_loc(:,:,:), delta_det(:,:,:,:)
+  double precision, allocatable  :: delta_loc(:,:,:,:), delta_det(:,:,:,:)
   double precision, allocatable  :: dress_detail(:,:)
   double precision               :: dress_mwen(N_states)
   integer(ZMQ_PTR),external      :: new_zmq_to_qp_run_socket
@@ -154,7 +155,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
   integer :: more
   integer :: i, j, k, i_state, N
-  integer :: task_id, ind
+  integer :: task_id, ind, inds(delta_loc_N)
   double precision, save :: time0 = -1.d0
   double precision :: time, timeLast, old_tooth
   double precision, external :: omp_get_wtime
@@ -162,12 +163,17 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   integer, allocatable :: parts_to_get(:)
   logical, allocatable :: actually_computed(:)
   integer :: total_computed
-  
+  integer :: delta_loc_cur
+  double precision :: fac(delta_loc_N) , wei(delta_loc_N)
+  logical :: ok
+
+  delta_loc_cur = 1
+
   delta = 0d0
   delta_s2 = 0d0
   allocate(delta_det(N_states, N_det, 0:comb_teeth+1, 2))
   allocate(cp(N_states, N_det, N_cp, 2), dress_detail(N_states, N_det))
-  allocate(delta_loc(N_states, N_det, 2))
+  allocate(delta_loc(N_states, N_det, 2, delta_loc_N))
   dress_detail = 0d0
   delta_det = 0d0
   cp = 0d0
@@ -196,57 +202,101 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   cur_cp = 0
   old_cur_cp = 0
   logical :: loop
+  integer :: felem, felem_loc
   loop = .true.
-
+  felem = N_det+1
   pullLoop : do while (loop)
-    call pull_dress_results(zmq_socket_pull, ind, delta_loc, task_id)
-    dress_mwen(:) = 0d0 
-    
-    !!!!! A VERIFIER !!!!!
-    do i_state=1,N_states
-      do i=1, N_det
-        dress_mwen(i_state) += delta_loc(i_state, i, 1) * psi_coef(i, i_state)
-      end do
-    end do
-      
-    dress_detail(:, ind) += dress_mwen(:)
-    do j=1,N_cp !! optimizable
-      if(cps(ind, j) > 0d0) then
-        if(tooth_of_det(ind) < cp_first_tooth(j)) stop "coef on supposedely deterministic det"
-        double precision :: fac
-        integer :: toothMwen
-        logical :: fracted
-        fac = cps(ind, j) / cps_N(j) * dress_weight_inv(ind) * comb_step
-        cp(1:N_states,1:N_det,j,1) += delta_loc(1:N_states,1:N_det,1) * fac
-        cp(1:N_states,1:N_det,j,2) += delta_loc(1:N_states,1:N_det,2) * fac
-      end if
-    end do
-    toothMwen = tooth_of_det(ind)
-    fracted = (toothMwen /= 0)
-    if(fracted) fracted = (ind == first_det_of_teeth(toothMwen))
-    
-    if(fracted) then
-      delta_det(1:N_states,1:N_det,toothMwen-1, 1) = delta_det(1:N_states,1:N_det,toothMwen-1, 1) + delta_loc(1:N_states,1:N_det,1) * (1d0-fractage(toothMwen))
-      delta_det(1:N_states,1:N_det,toothMwen-1, 2) = delta_det(1:N_states,1:N_det,toothMwen-1, 2) + delta_loc(1:N_states,1:N_det,2) * (1d0-fractage(toothMwen))
-      delta_det(1:N_states,1:N_det,toothMwen  , 1) = delta_det(1:N_states,1:N_det,toothMwen  , 1) + delta_loc(1:N_states,1:N_det,1) * (fractage(toothMwen))
-      delta_det(1:N_states,1:N_det,toothMwen  , 2) = delta_det(1:N_states,1:N_det,toothMwen  , 2) + delta_loc(1:N_states,1:N_det,2) * (fractage(toothMwen))
-    else
-      delta_det(1:N_states,1:N_det,toothMwen  , 1) = delta_det(1:N_states,1:N_det,toothMwen  , 1) + delta_loc(1:N_states,1:N_det,1)
-      delta_det(1:N_states,1:N_det,toothMwen  , 2) = delta_det(1:N_states,1:N_det,toothMwen  , 2) + delta_loc(1:N_states,1:N_det,2)
-    end if
-
-    parts_to_get(ind) -= 1
-    if(parts_to_get(ind) == 0) then
-      actually_computed(ind) = .true.
-      total_computed += 1
-    end if
-
-
+    call pull_dress_results(zmq_socket_pull, ind, delta_loc(1,1,1,delta_loc_cur), task_id, felem_loc)
+    felem = min(felem_loc, felem)
+    dress_mwen(:) = 0d0
+ 
     integer, external :: zmq_delete_tasks
+   
     if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,1,more) == -1) then
         stop 'Unable to delete tasks'
     endif
     if(more == 0) loop = .false.
+
+   
+    do i_state=1,N_states
+      do i=1, N_det
+        dress_mwen(i_state) += delta_loc(i_state, i, 1, delta_loc_cur) * psi_coef(i, i_state)
+      end do
+    end do
+      
+    dress_detail(:, ind) += dress_mwen(:)
+    wei(delta_loc_cur) = dress_weight_inv(ind)
+    inds(delta_loc_cur) = ind
+
+    if(delta_loc_cur == delta_loc_N .or. .not. loop) then
+      do j=1,N_cp !! optimizable
+        fac = 0d0
+        ok = .false.
+      
+        do i=1,delta_loc_cur
+          !fac(i) = cps(inds(i), j) / cps_N(j) * wei(i) * comb_step
+          fac(i) = cps(inds(i), j) * wei(i) * comb_step
+          if(fac(i) /= 0d0) ok = .true.
+        end do
+
+        if(ok) then
+          do i=felem,N_det
+            cp(:,i,j,1) += delta_loc(:,i,1,1) * fac(1)  &
+                + delta_loc(:,i,1,2) * fac(2)   
+                !+ delta_loc(:,i,1,3) * fac(3)  &
+                !+ delta_loc(:,i,1,4) * fac(4)  &
+                !+ delta_loc(:,i,1,5) * fac(5)  &
+                !+ delta_loc(:,i,1,6) * fac(6)  &
+                !+ delta_loc(:,i,1,7) * fac(7)  &
+                !+ delta_loc(:,i,1,8) * fac(8)
+
+            cp(:,i,j,1) += delta_loc(:,i,2,1) * fac(1)  &
+                + delta_loc(:,i,2,2) * fac(2)   
+                !+ delta_loc(:,i,2,3) * fac(3)  &
+                !+ delta_loc(:,i,2,4) * fac(4)  &
+                !+ delta_loc(:,i,2,5) * fac(5)  &
+                !+ delta_loc(:,i,2,6) * fac(6)  &
+                !+ delta_loc(:,i,2,7) * fac(7)  &
+                !+ delta_loc(:,i,2,8) * fac(8)
+          end do
+          !cp(1:N_states,indi:N_det,j,1) += delta_loc(1:N_states,indi:N_det,1) * fac
+          !cp(1:N_states,indi:N_det,j,2) += delta_loc(1:N_states,indi:N_det,2) * fac
+        end if
+      end do
+       
+       do i=1,delta_loc_cur
+         logical :: fracted
+         integer :: toothMwen
+         ind = inds(i)
+
+         toothMwen = tooth_of_det(ind)
+         fracted = (toothMwen /= 0)
+         if(fracted) fracted = (ind == first_det_of_teeth(toothMwen))
+    
+         if(fracted) then
+           delta_det(1:N_states,felem:N_det,toothMwen-1, 1) = delta_det(1:N_states,felem:N_det,toothMwen-1, 1) + delta_loc(felem:N_states,1:N_det,1,i) * (1d0-fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen-1, 2) = delta_det(1:N_states,felem:N_det,toothMwen-1, 2) + delta_loc(felem:N_states,1:N_det,2,i) * (1d0-fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen  , 1) = delta_det(1:N_states,felem:N_det,toothMwen  , 1) + delta_loc(felem:N_states,1:N_det,1,i) * (fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen  , 2) = delta_det(1:N_states,felem:N_det,toothMwen  , 2) + delta_loc(felem:N_states,1:N_det,2,i) * (fractage(toothMwen))
+         else
+           delta_det(1:N_states,felem:N_det,toothMwen  , 1) = delta_det(1:N_states,felem:N_det,toothMwen  , 1) + delta_loc(1:N_states,felem:N_det,1,i)
+           delta_det(1:N_states,felem:N_det,toothMwen  , 2) = delta_det(1:N_states,felem:N_det,toothMwen  , 2) + delta_loc(1:N_states,felem:N_det,2,i)
+         end if
+
+         parts_to_get(ind) -= 1
+         if(parts_to_get(ind) == 0) then
+           actually_computed(ind) = .true.
+           total_computed += 1
+         end if
+       end do
+       felem = N_det+1
+       delta_loc_cur = 1
+    else
+      delta_loc_cur += 1
+      cycle
+    end if
+
+
 
     time = omp_get_wtime()
     
@@ -303,18 +353,22 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       endif
     end if
   end do pullLoop
+  
+  delta   (1:N_states,1:N_det) = 0d0
+  delta_s2(1:N_states,1:N_det) = 0d0
 
   if(total_computed == N_det_generators) then
-    delta   (1:N_states,1:N_det) = 0d0
-    delta_s2(1:N_states,1:N_det) = 0d0
     do i=comb_teeth+1,0,-1
       delta   (1:N_states,1:N_det) = delta   (1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,1)
       delta_s2(1:N_states,1:N_det) = delta_s2(1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,2)
     end do
   else
-
-    delta   (1:N_states,1:N_det) = cp(1:N_states,1:N_det,cur_cp,1)
-    delta_s2(1:N_states,1:N_det) = cp(1:N_states,1:N_det,cur_cp,2)
+    do i=1,cur_cp
+      delta   (1:N_states,1:N_det) += cp(1:N_states,1:N_det,i,1)
+      delta_s2(1:N_states,1:N_det) += cp(1:N_states,1:N_det,i,2)
+    end do
+    delta   (1:N_states,1:N_det) = delta(1:N_states,1:N_det) / cps_N(cur_cp)
+    delta_s2(1:N_states,1:N_det) = delta_s2(1:N_states,1:N_det) / cps_N(cur_cp)
     do i=cp_first_tooth(cur_cp)-1,0,-1
       delta   (1:N_states,1:N_det) = delta   (1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,1)
       delta_s2(1:N_states,1:N_det) = delta_s2(1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,2)
@@ -363,7 +417,7 @@ end function
 ! gen_per_cp : number of generators per checkpoint
   END_DOC
   comb_teeth = 64
-  N_cps_max = 64
+  N_cps_max = 32
   gen_per_cp = (N_det_generators / N_cps_max) + 1
 END_PROVIDER
 
@@ -455,13 +509,19 @@ END_PROVIDER
       end if
     end do
   end do
-  cps(:, N_cp) = 0d0
   cp_first_tooth(N_cp) = comb_teeth+1
 
   iorder = -1
   do i=1,N_cp-1
     call isort(dress_jobs(first_cp(i)+1:first_cp(i+1)),iorder,first_cp(i+1)-first_cp(i))
   end do
+  
+  do i=1,N_det_generators
+    do j=N_cp,2,-1
+      cps(i,j) -= cps(i,j-1)
+    end do
+  end do
+  cps(:, N_cp) = 0d0
 END_PROVIDER
 
 
