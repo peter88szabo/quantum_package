@@ -98,7 +98,7 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
       print *,  irp_here, ': Failed in zmq_set_running'
     endif
     
-    !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc+1)              &
+    !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc)              &
         !$OMP  PRIVATE(i)
     i = omp_get_thread_num()
     if (i==0) then
@@ -163,7 +163,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   integer, allocatable :: parts_to_get(:)
   logical, allocatable :: actually_computed(:)
   integer :: total_computed
-  integer :: delta_loc_cur
+  integer :: delta_loc_cur, is
   double precision :: fac(delta_loc_N) , wei(delta_loc_N)
   logical :: ok
 
@@ -219,7 +219,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
    
     do i_state=1,N_states
-      do i=1, N_det
+      do i=felem_loc, N_det
         dress_mwen(i_state) += delta_loc(i_state, i, 1, delta_loc_cur) * psi_coef(i, i_state)
       end do
     end do
@@ -232,35 +232,36 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       do j=1,N_cp !! optimizable
         fac = 0d0
         ok = .false.
-      
         do i=1,delta_loc_cur
           !fac(i) = cps(inds(i), j) / cps_N(j) * wei(i) * comb_step
           fac(i) = cps(inds(i), j) * wei(i) * comb_step
-          if(fac(i) /= 0d0) ok = .true.
+          if(fac(i) /= 0d0) then
+            ok = .true.
+          end if
         end do
-
+        
         if(ok) then
-          do i=felem,N_det
-            cp(:,i,j,1) += delta_loc(:,i,1,1) * fac(1)  &
-                + delta_loc(:,i,1,2) * fac(2)   
-                !+ delta_loc(:,i,1,3) * fac(3)  &
-                !+ delta_loc(:,i,1,4) * fac(4)  &
+          do i=felem,N_det_generators
+          do is=1,N_states
+            cp(is,i,j,1) += delta_loc(is,i,1,1) * fac(1) & 
+                + delta_loc(is,i,1,2) * fac(2)  
+                !+ delta_loc(is,i,1,3) * fac(3)  &
+                !+ delta_loc(is,i,1,4) * fac(4) & 
                 !+ delta_loc(:,i,1,5) * fac(5)  &
                 !+ delta_loc(:,i,1,6) * fac(6)  &
                 !+ delta_loc(:,i,1,7) * fac(7)  &
                 !+ delta_loc(:,i,1,8) * fac(8)
 
-            cp(:,i,j,1) += delta_loc(:,i,2,1) * fac(1)  &
-                + delta_loc(:,i,2,2) * fac(2)   
-                !+ delta_loc(:,i,2,3) * fac(3)  &
-                !+ delta_loc(:,i,2,4) * fac(4)  &
+            cp(is,i,j,2) += delta_loc(is,i,2,1) * fac(1) & 
+                + delta_loc(is,i,2,2) * fac(2)  
+                !+ delta_loc(is,i,2,3) * fac(3)  &
+                !+ delta_loc(is,i,2,4) * fac(4) & 
                 !+ delta_loc(:,i,2,5) * fac(5)  &
                 !+ delta_loc(:,i,2,6) * fac(6)  &
                 !+ delta_loc(:,i,2,7) * fac(7)  &
                 !+ delta_loc(:,i,2,8) * fac(8)
           end do
-          !cp(1:N_states,indi:N_det,j,1) += delta_loc(1:N_states,indi:N_det,1) * fac
-          !cp(1:N_states,indi:N_det,j,2) += delta_loc(1:N_states,indi:N_det,2) * fac
+          end do
         end if
       end do
        
@@ -274,10 +275,10 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
          if(fracted) fracted = (ind == first_det_of_teeth(toothMwen))
     
          if(fracted) then
-           delta_det(1:N_states,felem:N_det,toothMwen-1, 1) = delta_det(1:N_states,felem:N_det,toothMwen-1, 1) + delta_loc(felem:N_states,1:N_det,1,i) * (1d0-fractage(toothMwen))
-           delta_det(1:N_states,felem:N_det,toothMwen-1, 2) = delta_det(1:N_states,felem:N_det,toothMwen-1, 2) + delta_loc(felem:N_states,1:N_det,2,i) * (1d0-fractage(toothMwen))
-           delta_det(1:N_states,felem:N_det,toothMwen  , 1) = delta_det(1:N_states,felem:N_det,toothMwen  , 1) + delta_loc(felem:N_states,1:N_det,1,i) * (fractage(toothMwen))
-           delta_det(1:N_states,felem:N_det,toothMwen  , 2) = delta_det(1:N_states,felem:N_det,toothMwen  , 2) + delta_loc(felem:N_states,1:N_det,2,i) * (fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen-1, 1) = delta_det(1:N_states,felem:N_det,toothMwen-1, 1) + delta_loc(1:N_states,felem:N_det,1,i) * (1d0-fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen-1, 2) = delta_det(1:N_states,felem:N_det,toothMwen-1, 2) + delta_loc(1:N_states,felem:N_det,2,i) * (1d0-fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen  , 1) = delta_det(1:N_states,felem:N_det,toothMwen  , 1) + delta_loc(1:N_states,felem:N_det,1,i) * (fractage(toothMwen))
+           delta_det(1:N_states,felem:N_det,toothMwen  , 2) = delta_det(1:N_states,felem:N_det,toothMwen  , 2) + delta_loc(1:N_states,felem:N_det,2,i) * (fractage(toothMwen))
          else
            delta_det(1:N_states,felem:N_det,toothMwen  , 1) = delta_det(1:N_states,felem:N_det,toothMwen  , 1) + delta_loc(1:N_states,felem:N_det,1,i)
            delta_det(1:N_states,felem:N_det,toothMwen  , 2) = delta_det(1:N_states,felem:N_det,toothMwen  , 2) + delta_loc(1:N_states,felem:N_det,2,i)
@@ -289,7 +290,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
            total_computed += 1
          end if
        end do
-       felem = N_det+1
+       felem = N_det_generators+1
        delta_loc_cur = 1
     else
       delta_loc_cur += 1
@@ -431,18 +432,22 @@ END_PROVIDER
 &BEGIN_PROVIDER [ integer, dress_jobs, (N_det_generators) ]
 &BEGIN_PROVIDER [ double precision, comb, (N_det_generators) ]
   implicit none
-  logical, allocatable         :: computed(:)
+  logical, allocatable         :: computed(:), comp_filler(:)
   integer                        :: i, j, last_full, dets(comb_teeth)
   integer                        :: k, l, cur_cp, under_det(comb_teeth+1)
   integer, allocatable :: iorder(:), first_cp(:)
+  integer, allocatable :: filler(:)
+  integer :: nfiller, lfiller, cfiller
 
+  allocate(filler(n_det_generators))
   allocate(iorder(N_det_generators), first_cp(N_cps_max+1))
   allocate(computed(N_det_generators))
+  allocate(comp_filler(N_det_generators))
   first_cp = 1
   cps = 0d0
   cur_cp = 1
   done_cp_at = 0
-  
+  comp_filler = .false.
   computed = .false.
   
   N_dress_jobs = first_det_of_comb - 1
@@ -453,6 +458,8 @@ END_PROVIDER
   
   l=first_det_of_comb
   call RANDOM_NUMBER(comb)
+  lfiller = 1
+  nfiller = 1
   do i=1,N_det_generators
     comb(i) = comb(i) * comb_step
     !DIR$ FORCEINLINE
@@ -469,15 +476,45 @@ END_PROVIDER
       
       if (N_dress_jobs == N_det_generators) exit
     end if
-    do while (computed(l))
-      l=l+1
-    enddo
-    k=N_dress_jobs+1
-    dress_jobs(k) = l
-    computed(l) = .True.
-    N_dress_jobs = k
+    
+    do l=1,N_det_generators
+      if((.not. computed(l)) .and. (.not. comp_filler(l))) exit
+    end do
+    
+    if(l > N_det_generators) exit
+    
+    cfiller = tooth_of_det(l)
+    if(cfiller > lfiller) then
+      do j=1,nfiller-1
+        if(.not. computed(filler(j))) then
+          k=N_dress_jobs+1
+          dress_jobs(k) = filler(j)
+          N_dress_jobs = k
+        end if  
+        computed(filler(j)) = .true.
+      end do
+      nfiller = 2
+      filler(1) = l
+      lfiller = cfiller
+    else
+      filler(nfiller) = l
+      nfiller += 1
+    end if
+    comp_filler(l) = .True.
   enddo
+
+  
+  do j=1,nfiller-1
+     if(.not. computed(filler(j)))then
+       k=N_dress_jobs+1
+       dress_jobs(k) = filler(j)
+       N_dress_jobs = k
+     end if
+      computed(filler(j)) = .true.
+  end do
+
   N_cp = cur_cp
+  
   if(N_dress_jobs /= N_det_generators .or. N_cp > N_cps_max) then
     print *, N_dress_jobs, N_det_generators, N_cp, N_cps_max
     stop "error in jobs creation"
@@ -510,18 +547,19 @@ END_PROVIDER
     end do
   end do
   cp_first_tooth(N_cp) = comb_teeth+1
-
-  iorder = -1
-  do i=1,N_cp-1
-    call isort(dress_jobs(first_cp(i)+1:first_cp(i+1)),iorder,first_cp(i+1)-first_cp(i))
-  end do
   
   do i=1,N_det_generators
     do j=N_cp,2,-1
       cps(i,j) -= cps(i,j-1)
     end do
   end do
-  cps(:, N_cp) = 0d0
+
+  iorder = -1
+  do i=1,N_cp-1
+    call isort(dress_jobs(first_cp(i)+1:first_cp(i+1)),iorder,first_cp(i+1)-first_cp(i))
+  end do
+  
+  cps(:, N_cp) = 0d0 
 END_PROVIDER
 
 
