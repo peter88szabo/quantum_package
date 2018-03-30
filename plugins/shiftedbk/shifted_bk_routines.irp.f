@@ -1,5 +1,16 @@
 use selection_types
 
+
+ BEGIN_PROVIDER [ integer, N_dress_int_buffer ]
+&BEGIN_PROVIDER [ integer, N_dress_double_buffer ]
+&BEGIN_PROVIDER [ integer, N_dress_det_buffer ]
+  implicit none
+  N_dress_int_buffer = 1
+  N_dress_double_buffer = 1
+  N_dress_det_buffer = 1
+END_PROVIDER
+
+
  BEGIN_PROVIDER [ double precision, fock_diag_tmp_, (2,mo_tot_num+1,Nproc) ]
 &BEGIN_PROVIDER [ integer, current_generator_, (Nproc) ]
 &BEGIN_PROVIDER [ double precision, a_h_i, (N_det, Nproc) ]
@@ -21,6 +32,24 @@ use selection_types
   a_s2_i = 0d0
  END_PROVIDER
 
+subroutine generator_done(i_gen)
+  implicit none
+  integer, intent(in) :: i_gen
+  
+  !dress_int_buffer = ...
+end subroutine
+
+
+subroutine dress_pulled(int_buf, double_buf, det_buf, N_buf)
+  use bitmasks
+  implicit none
+  
+  integer, intent(in) :: N_buf(3)
+  integer, intent(in) :: int_buf(*)
+  double precision, intent(in) :: double_buf(*)
+  integer(bit_kind), intent(in) :: det_buf(N_int,2,*)
+
+end subroutine
 
 
 subroutine delta_ij_done()

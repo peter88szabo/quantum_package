@@ -1,3 +1,5 @@
+use bitmasks
+
 BEGIN_PROVIDER [ integer, fragment_count ]
   implicit none
   BEGIN_DOC
@@ -54,7 +56,7 @@ subroutine run_dress_slave(thread,iproc,energy)
       read (task,*) subset, i_generator
       delta_ij_loc = 0d0
       call alpha_callback(delta_ij_loc, i_generator, subset, iproc)
-
+      call generator_done(i_generator)
       call task_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id)
       call push_dress_results(zmq_socket_push, i_generator, delta_ij_loc, task_id)
     else
@@ -65,6 +67,17 @@ subroutine run_dress_slave(thread,iproc,energy)
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call end_zmq_push_socket(zmq_socket_push,thread)
 end subroutine
+
+
+ BEGIN_PROVIDER [ integer, dress_int_buffer, (N_dress_int_buffer) ]
+&BEGIN_PROVIDER [ double precision, dress_double_buffer, (N_dress_double_buffer) ]
+&BEGIN_PROVIDER [ integer(bit_kind), dress_det_buffer, (N_int, 2, N_dress_det_buffer) ]
+  implicit none
+  
+  dress_int_buffer = 0
+  dress_double_buffer = 0d0
+  dress_det_buffer = 0_bit_kind
+END_PROVIDER
 
 
 subroutine push_dress_results(zmq_socket_push, ind, delta_loc, task_id)
@@ -89,7 +102,7 @@ subroutine push_dress_results(zmq_socket_push, ind, delta_loc, task_id)
 
   rc = f77_zmq_send( zmq_socket_push, ind, 4, ZMQ_SNDMORE)
   if(rc /= 4) stop "push"
- 
+
   rc = f77_zmq_send( zmq_socket_push, felem, 4, ZMQ_SNDMORE)
   if(rc /= 4) stop "push"
   
@@ -99,6 +112,29 @@ subroutine push_dress_results(zmq_socket_push, ind, delta_loc, task_id)
   rc = f77_zmq_send( zmq_socket_push, delta_loc(1,felem,2), 8*N_states*(N_det-felem+1), ZMQ_SNDMORE)
   if(rc /= 8*N_states*(N_det+1-felem)) stop "push"
   
+ 
+ 
+
+  rc = f77_zmq_send( zmq_socket_push, N_dress_int_buffer, 4, ZMQ_SNDMORE)
+  if(rc /= 4) stop "push" 
+  
+  rc = f77_zmq_send( zmq_socket_push, dress_int_buffer, 4*N_dress_int_buffer, ZMQ_SNDMORE)
+  if(rc /= 4*N_dress_int_buffer) stop "push"
+
+  rc = f77_zmq_send( zmq_socket_push, N_dress_double_buffer, 4, ZMQ_SNDMORE)
+  if(rc /= 4) stop "push" 
+  
+  rc = f77_zmq_send( zmq_socket_push, dress_double_buffer, 8*N_dress_double_buffer, ZMQ_SNDMORE)
+  if(rc /= 8*N_dress_double_buffer) stop "push"
+ 
+
+  rc = f77_zmq_send( zmq_socket_push, N_dress_det_buffer, 4, ZMQ_SNDMORE)
+  if(rc /= 4) stop "push" 
+  
+  rc = f77_zmq_send( zmq_socket_push, dress_det_buffer, 2*N_int*bit_kind*N_dress_det_buffer, ZMQ_SNDMORE)
+  if(rc /= 2*N_int*bit_kind*N_dress_det_buffer) stop "push"
+ 
+
   rc = f77_zmq_send( zmq_socket_push, task_id, 4, 0)
   if(rc /= 4) stop "push"
 
@@ -112,15 +148,19 @@ IRP_ENDIF
 end subroutine
 
 
-subroutine pull_dress_results(zmq_socket_pull, ind, delta_loc, task_id, felem)
+subroutine pull_dress_results(zmq_socket_pull, ind, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, felem)
   use f77_zmq
   implicit none
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
   double precision, intent(inout) :: delta_loc(N_states, N_det, 2)
+  double precision, intent(out) :: double_buf(*)
+  integer, intent(out) :: int_buf(*)
+  integer(bit_kind), intent(out) :: det_buf(N_int, 2, *)
   integer, intent(out) :: felem
   integer, intent(out) :: ind
   integer, intent(out) :: task_id
   integer :: rc, i
+  integer, intent(out) :: N_buf(3)
 
 
   rc = f77_zmq_recv( zmq_socket_pull, ind, 4, 0)
@@ -136,6 +176,34 @@ subroutine pull_dress_results(zmq_socket_pull, ind, delta_loc, task_id, felem)
   
   rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,felem,2), N_states*8*(N_det+1-felem), 0)
   if(rc /= 8*N_states*(N_det+1-felem)) stop "pull"
+
+
+  rc = f77_zmq_recv( zmq_socket_pull, N_buf(1), 4, 0)
+  if(rc /= 4) stop "pull" 
+  if(N_buf(1) > N_dress_int_buffer) stop "run_dress_slave N_buf bad size?"
+
+  
+  rc = f77_zmq_recv( zmq_socket_pull, int_buf, 4*N_buf(1), 0)
+  if(rc /= 4*N_buf(1)) stop "pull1"
+
+
+  rc = f77_zmq_recv( zmq_socket_pull, N_buf(2), 4, 0)
+  if(rc /= 4) stop "pull" 
+  if(N_buf(2) > N_dress_double_buffer) stop "run_dress_slave N_buf bad size?"
+  
+  rc = f77_zmq_recv( zmq_socket_pull, double_buf, 8*N_buf(2), 0)
+  if(rc /= 8*N_buf(2)) stop "pull2"
+  
+
+
+
+  rc = f77_zmq_recv( zmq_socket_pull, N_buf(3), 4, 0)
+  if(rc /= 4) stop "pull" 
+  if(N_buf(3) > N_dress_det_buffer) stop "run_dress_slave N_buf bad size?"
+  
+  rc = f77_zmq_recv( zmq_socket_pull, det_buf, 2*N_int*bit_kind*N_buf(3), 0)
+  if(rc /= 2*N_int*bit_kind*N_buf(3)) stop "pull3"
+ 
 
   rc = f77_zmq_recv( zmq_socket_pull, task_id, 4, 0)
   if(rc /= 4) stop "pull"

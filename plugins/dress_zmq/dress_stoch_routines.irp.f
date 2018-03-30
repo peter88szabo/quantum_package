@@ -163,10 +163,14 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   integer, allocatable :: parts_to_get(:)
   logical, allocatable :: actually_computed(:)
   integer :: total_computed
-  integer :: delta_loc_cur, is
+  integer :: delta_loc_cur, is, N_buf(3)
   double precision :: fac(delta_loc_N) , wei(delta_loc_N)
   logical :: ok
+  integer, allocatable :: int_buf(:)
+  double precision, allocatable :: double_buf(:)
+  integer(bit_kind), allocatable :: det_buf(:,:,:)
 
+  allocate(int_buf(N_dress_int_buffer), double_buf(N_dress_double_buffer),det_buf(N_int,2,N_dress_det_buffer))
   delta_loc_cur = 1
 
   delta = 0d0
@@ -206,7 +210,8 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   loop = .true.
   felem = N_det+1
   pullLoop : do while (loop)
-    call pull_dress_results(zmq_socket_pull, ind, delta_loc(1,1,1,delta_loc_cur), task_id, felem_loc)
+    call pull_dress_results(zmq_socket_pull, ind, delta_loc(1,1,1,delta_loc_cur), int_buf, double_buf, det_buf, N_buf, task_id, felem_loc)
+    call dress_pulled(int_buf, double_buf, det_buf, N_buf) 
     felem = min(felem_loc, felem)
     dress_mwen(:) = 0d0
  
@@ -449,7 +454,8 @@ END_PROVIDER
   done_cp_at = 0
   comp_filler = .false.
   computed = .false.
-  
+  cps_N = 1d0
+
   N_dress_jobs = first_det_of_comb - 1
   do i=1, N_dress_jobs
     dress_jobs(i) = i
