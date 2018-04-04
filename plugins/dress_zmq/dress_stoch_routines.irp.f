@@ -211,7 +211,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   felem = N_det+1
   pullLoop : do while (loop)
     call pull_dress_results(zmq_socket_pull, ind, delta_loc(1,1,1,delta_loc_cur), int_buf, double_buf, det_buf, N_buf, task_id, felem_loc)
-    call dress_pulled(int_buf, double_buf, det_buf, N_buf) 
+    call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
     felem = min(felem_loc, felem)
     dress_mwen(:) = 0d0
  

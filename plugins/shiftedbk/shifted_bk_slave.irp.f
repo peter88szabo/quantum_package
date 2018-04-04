@@ -10,7 +10,7 @@ program shifted_bk
   PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
   PROVIDE psi_bilinear_matrix_transp_order
 
-  call diagonalize_CI()
+  !call diagonalize_CI()
   call dress_slave()
 end
 

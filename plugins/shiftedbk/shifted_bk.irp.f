@@ -11,7 +11,7 @@ program shifted_bk
   PROVIDE psi_bilinear_matrix_transp_order
 
 
-  call diagonalize_CI()
+  !call diagonalize_CI()
   call dress_zmq()
 end
 

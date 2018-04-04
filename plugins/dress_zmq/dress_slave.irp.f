@@ -6,6 +6,10 @@ subroutine dress_slave
   read_wf = .False.
   distributed_davidson = .False.
   SOFT_TOUCH read_wf distributed_davidson
+  
+  threshold_selectors = 1.d0
+  threshold_generators = 1d0 
+ 
   call provide_everything
   call switch_qp_run_to_master
   call run_wf
@@ -67,6 +71,6 @@ subroutine dress_slave_tcp(i,energy)
   integer, intent(in)            :: i
   logical :: lstop
   lstop = .False.
-  call run_dress_slave(0,i,energy,lstop)
+  call run_dress_slave(0,i,energy)
 end
 

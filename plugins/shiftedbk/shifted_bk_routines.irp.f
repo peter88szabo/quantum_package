@@ -1,30 +1,21 @@
 use selection_types
 
-
- BEGIN_PROVIDER [ integer, N_dress_int_buffer ]
-&BEGIN_PROVIDER [ integer, N_dress_double_buffer ]
-&BEGIN_PROVIDER [ integer, N_dress_det_buffer ]
-  implicit none
-  N_dress_int_buffer = 1
-  N_dress_double_buffer = 1
-  N_dress_det_buffer = 1
-END_PROVIDER
-
-
  BEGIN_PROVIDER [ double precision, fock_diag_tmp_, (2,mo_tot_num+1,Nproc) ]
-&BEGIN_PROVIDER [ integer, current_generator_, (Nproc) ]
+&BEGIN_PROVIDER [ integer, n_det_add ]
 &BEGIN_PROVIDER [ double precision, a_h_i, (N_det, Nproc) ]
 &BEGIN_PROVIDER [ double precision, a_s2_i, (N_det, Nproc) ]
 &BEGIN_PROVIDER [ type(selection_buffer), sb, (Nproc) ]
+&BEGIN_PROVIDER [ type(selection_buffer), global_sb ]
+&BEGIN_PROVIDER [ type(selection_buffer), mini_sb ]
 &BEGIN_PROVIDER [ double precision, N_det_increase_factor ]
   implicit none
   integer :: i
-  integer :: n_det_add
   
   N_det_increase_factor = 1d0
 
-  current_generator_(:) = 0
   n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
+  call create_selection_buffer(n_det_add, n_det_add*2, global_sb)
+  call create_selection_buffer(n_det_add, n_det_add*2, mini_sb)
   do i=1,Nproc
     call create_selection_buffer(n_det_add, n_det_add*2, sb(i))
   end do
@@ -32,46 +23,82 @@ END_PROVIDER
   a_s2_i = 0d0
  END_PROVIDER
 
-subroutine generator_done(i_gen)
+
+ BEGIN_PROVIDER [ integer, N_dress_int_buffer ]
+&BEGIN_PROVIDER [ integer, N_dress_double_buffer ]
+&BEGIN_PROVIDER [ integer, N_dress_det_buffer ]
   implicit none
-  integer, intent(in) :: i_gen
+  N_dress_int_buffer = 1
+  N_dress_double_buffer = n_det_add
+  N_dress_det_buffer = n_det_add
+END_PROVIDER
+
+
+subroutine generator_done(i_gen, int_buf, double_buf, det_buf, N_buf, iproc)
+  implicit none
+  integer, intent(in) :: i_gen, iproc
+  integer, intent(out) :: int_buf(N_dress_int_buffer), N_buf(3)
+  double precision, intent(out) :: double_buf(N_dress_double_buffer)
+  integer(bit_kind), intent(out) :: det_buf(N_int, 2, N_dress_det_buffer)
+  integer :: i
   
-  !dress_int_buffer = ...
+    call sort_selection_buffer(sb(iproc))
+    det_buf(:,:,:sb(iproc)%cur) = sb(iproc)%det(:,:,:sb(iproc)%cur)
+    double_buf(:sb(iproc)%cur) = sb(iproc)%val(:sb(iproc)%cur)
+    if(sb(iproc)%cur > 0) then
+      !$OMP CRITICAL
+      call merge_selection_buffers(sb(iproc), mini_sb)
+      call sort_selection_buffer(mini_sb)
+      do i=1,Nproc
+        sb(i)%mini = min(sb(i)%mini, mini_sb%mini)
+      end do
+      !$OMP END CRITICAL
+    end if
+    N_buf(1) = 1
+    N_buf(2) = sb(iproc)%cur
+    N_buf(3) = sb(iproc)%cur
+    sb(iproc)%cur = 0
 end subroutine
 
 
-subroutine dress_pulled(int_buf, double_buf, det_buf, N_buf)
+subroutine generator_start(i_gen, iproc)
+  implicit none
+  integer, intent(in) :: i_gen, iproc
+  integer :: i
+  
+  call build_fock_tmp(fock_diag_tmp_(1,1,iproc),psi_det_generators(1,1,i_gen),N_int)
+end subroutine
+
+
+subroutine dress_pulled(ind, int_buf, double_buf, det_buf, N_buf)
   use bitmasks
   implicit none
   
-  integer, intent(in) :: N_buf(3)
+  integer, intent(in) :: ind, N_buf(3)
   integer, intent(in) :: int_buf(*)
   double precision, intent(in) :: double_buf(*)
   integer(bit_kind), intent(in) :: det_buf(N_int,2,*)
-
+  integer :: i
+  
+  do i=1,N_buf(2)
+    call add_to_selection_buffer(global_sb, det_buf(1,1,i), double_buf(i))
+  end do
 end subroutine
 
 
 subroutine delta_ij_done()
   use bitmasks
   implicit none
-  integer :: i, n_det_add, old_det_gen
+  integer :: i, old_det_gen
   integer(bit_kind), allocatable :: old_generators(:,:,:)
   
   allocate(old_generators(N_int, 2, N_det_generators))
   old_generators(:,:,:) = psi_det_generators(:,:,:N_det_generators)
   old_det_gen = N_det_generators
  
-  call sort_selection_buffer(sb(1))
 
-  do i=2,Nproc
-    call sort_selection_buffer(sb(i))
-    call merge_selection_buffers(sb(i), sb(1))
-  end do
-  
-  call sort_selection_buffer(sb(1))
-  
-  call fill_H_apply_buffer_no_selection(sb(1)%cur,sb(1)%det,N_int,0) 
+  call sort_selection_buffer(global_sb)
+  call fill_H_apply_buffer_no_selection(global_sb%cur,global_sb%det,N_int,0) 
   call copy_H_apply_buffer_to_wf()
 
   if (s2_eig.or.(N_states > 1) ) then
@@ -226,17 +253,13 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
 
 
   
-  if(current_generator_(iproc) /= i_gen) then
-    current_generator_(iproc) = i_gen
-    call build_fock_tmp(fock_diag_tmp_(1,1,iproc),psi_det_generators(1,1,i_gen),N_int)
-  end if
-
   haa = diag_H_mat_elem_fock(psi_det_generators(1,1,i_gen),alpha,fock_diag_tmp_(1,1,iproc),N_int)
   
   call dress_with_alpha_(Nstates, Ndet, Nint, delta_ij_loc, minilist, det_minilist, n_minilist, alpha, haa, contrib, iproc)
-  
-  call add_to_selection_buffer(sb(iproc), alpha, contrib)
-
+ 
+  if(contrib < sb(iproc)%mini) then
+    call add_to_selection_buffer(sb(iproc), alpha, contrib)
+  end if
 end subroutine
 
 

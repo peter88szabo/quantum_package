@@ -93,8 +93,8 @@ BEGIN_PROVIDER [ double precision, delta_ij_tmp, (N_states,N_det_delta_ij,2) ]
   delta_ij_tmp = 0d0
 
   E_CI_before(:) = dress_E0_denominator(:) + nuclear_repulsion
-  threshold_selectors = 1.d0
-  threshold_generators = 1d0 
+  !threshold_selectors = 1.d0
+  !:threshold_generators = 1d0 
 !  if(errr /= 0d0) then
 !    errr = errr / 2d0 
 !  else

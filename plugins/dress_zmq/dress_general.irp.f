@@ -45,7 +45,7 @@ subroutine run_dressing(N_st,energy)
       do i=1,N_st
         if(.true.) call write_double(6,ci_energy_dressed(i),"Energy")
       enddo
-      call diagonalize_ci_dressed
+      if(.true.) call diagonalize_ci_dressed
       E_new = dress_e0_denominator(1) !sum(ci_energy_dressed(1:N_states))
 
       delta_E = (E_new - E_old)/dble(N_states)
