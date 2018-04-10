@@ -1,5 +1,13 @@
 use selection_types
 
+
+ BEGIN_PROVIDER [ double precision, global_sum_alpha2, (N_states) ]
+&BEGIN_PROVIDER [ double precision, slave_sum_alpha2, (N_states, Nproc) ]
+  global_sum_alpha2 = 0d0
+  slave_sum_alpha2 = 0d0 
+END_PROVIDER
+
+
  BEGIN_PROVIDER [ double precision, fock_diag_tmp_, (2,mo_tot_num+1,Nproc) ]
 &BEGIN_PROVIDER [ integer, n_det_add ]
 &BEGIN_PROVIDER [ double precision, a_h_i, (N_det, Nproc) ]
@@ -11,7 +19,8 @@ use selection_types
   implicit none
   integer :: i
   
-  N_det_increase_factor = 1d0
+ N_det_increase_factor = 1d0
+  
 
   n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
   call create_selection_buffer(n_det_add, n_det_add*2, global_sb)
@@ -29,7 +38,7 @@ use selection_types
 &BEGIN_PROVIDER [ integer, N_dress_det_buffer ]
   implicit none
   N_dress_int_buffer = 1
-  N_dress_double_buffer = n_det_add
+  N_dress_double_buffer = n_det_add+N_states
   N_dress_det_buffer = n_det_add
 END_PROVIDER
 
@@ -45,6 +54,11 @@ subroutine generator_done(i_gen, int_buf, double_buf, det_buf, N_buf, iproc)
     call sort_selection_buffer(sb(iproc))
     det_buf(:,:,:sb(iproc)%cur) = sb(iproc)%det(:,:,:sb(iproc)%cur)
     double_buf(:sb(iproc)%cur) = sb(iproc)%val(:sb(iproc)%cur)
+    double_buf(sb(iproc)%cur+1:sb(iproc)%cur+N_states) = slave_sum_alpha2(:,iproc)
+    N_buf(1) = 1
+    N_buf(2) = sb(iproc)%cur+N_states
+    N_buf(3) = sb(iproc)%cur
+    
     if(sb(iproc)%cur > 0) then
       !$OMP CRITICAL
       call merge_selection_buffers(sb(iproc), mini_sb)
@@ -54,10 +68,9 @@ subroutine generator_done(i_gen, int_buf, double_buf, det_buf, N_buf, iproc)
       end do
       !$OMP END CRITICAL
     end if
-    N_buf(1) = 1
-    N_buf(2) = sb(iproc)%cur
-    N_buf(3) = sb(iproc)%cur
+    
     sb(iproc)%cur = 0
+    slave_sum_alpha2(:,iproc) = 0d0
 end subroutine
 
 
@@ -80,9 +93,13 @@ subroutine dress_pulled(ind, int_buf, double_buf, det_buf, N_buf)
   integer(bit_kind), intent(in) :: det_buf(N_int,2,*)
   integer :: i
   
-  do i=1,N_buf(2)
+  do i=1,N_buf(3)
     call add_to_selection_buffer(global_sb, det_buf(1,1,i), double_buf(i))
   end do
+  if(N_buf(3) + N_states /= N_buf(2)) stop "buf size"
+  !$OMP CRITICAL
+  global_sum_alpha2(:) += double_buf(N_buf(3)+1:N_buf(2))
+  !$OMP END CRITICAL
 end subroutine
 
 
@@ -120,7 +137,7 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
   double precision, allocatable :: delta_ij_loc(:,:,:,:)
   integer :: exc(0:2,2,2), h1, h2, p1, p2, s1, s2
   integer :: i, j, k, ex, n_minilist, iproc, degree
-  double precision :: haa, contrib, phase
+  double precision :: haa, contrib, phase, c_alpha(N_states,Nproc), s_c_alpha(N_states)
   logical :: ok
   integer, external :: omp_get_thread_num
  
@@ -129,10 +146,11 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
   
   allocate(minilist(N_det_delta_ij), det_minilist(N_int, 2, N_det_delta_ij), delta_ij_loc(N_states, N_det_delta_ij, 2, Nproc))
   
+  c_alpha = 0d0
   delta_ij_loc = 0d0
   
   !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(STATIC) PRIVATE(i, j, iproc, n_minilist, ex) &
-  !$OMP PRIVATE(det_minilist, minilist, haa, contrib)  &
+  !$OMP PRIVATE(det_minilist, minilist, haa, contrib, s_c_alpha)  &
   !$OMP PRIVATE(exc, h1, h2, p1, p2, s1, s2, phase, degree, ok)
   do i=n_alpha,1,-1
     iproc = omp_get_thread_num()+1
@@ -167,19 +185,31 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
     end do
     call i_h_j(alpha(1,1,i), alpha(1,1,i), N_int, haa)
     call dress_with_alpha_(N_states, N_det_delta_ij, N_int, delta_ij_loc(1,1,1,iproc),  &
-        minilist, det_minilist, n_minilist, alpha(1,1,i), haa, contrib, iproc)
+        minilist, det_minilist, n_minilist, alpha(1,1,i), haa, contrib, s_c_alpha, iproc)
+    
+    c_alpha(:,iproc) += s_c_alpha(:)**2
   end do
   !$OMP END PARALLEL DO
   
   do i=2,Nproc
     delta_ij_loc(:,:,:,1) += delta_ij_loc(:,:,:,i)
+    c_alpha(:,1) += c_alpha(:,i)
   end do
   
   delta_ij_tmp(:,:,:) -= delta_ij_loc(:,:,:,1)
+  
+  
+  print *, "SUM ALPHA2  PRE", global_sum_alpha2
+  !global_sum_alpha2(:) -= c_alpha(:,1)
+  print *, "SUM ALPHA2 POST", c_alpha(:,1)
+  do i=1,N_states
+    delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
+  end do
+  global_sum_alpha2 = 0d0 
 end subroutine
 
 
-subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minilist, n_minilist, alpha, haa, contrib, iproc)
+subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minilist, n_minilist, alpha, haa, contrib, c_alpha, iproc)
   use bitmasks
   implicit none
   BEGIN_DOC
@@ -194,16 +224,16 @@ subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minili
   integer(bit_kind), intent(in)   :: alpha(Nint,2), det_minilist(Nint, 2, n_minilist)
   integer,intent(in)              :: minilist(n_minilist)
   double precision, intent(inout) :: delta_ij_loc(Nstates,Ndet,2)
-  double precision, intent(out)   :: contrib
+  double precision, intent(out)   :: contrib, c_alpha(N_states)
   double precision, intent(in)    :: haa
   double precision :: hij, sij
   integer                        :: i,j,k,l,m, l_sd
   double precision :: hdress, sdress
-  double precision :: de, a_h_psi(Nstates), c_alpha
+  double precision :: de, a_h_psi(Nstates)!, c_alpha
   
   contrib = 0d0
   a_h_psi = 0d0
-  
+  c_alpha = 0d0
 
   do l_sd=1,n_minilist
     call i_h_j_s2(alpha,det_minilist(1,1,l_sd),N_int,hij, sij)
@@ -220,12 +250,12 @@ subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minili
     de = E0_denominator(i) - haa
     if(DABS(de) < 1D-5) cycle
 
-    c_alpha = a_h_psi(i) / de
-    contrib = min(contrib, c_alpha * a_h_psi(i))
+    c_alpha(i) = a_h_psi(i) / de
+    contrib = min(contrib, c_alpha(i) * a_h_psi(i))
     
     do l_sd=1,n_minilist
-      hdress = c_alpha * a_h_i(l_sd, iproc)
-      sdress = c_alpha * a_s2_i(l_sd, iproc)
+      hdress = c_alpha(i) * a_h_i(l_sd, iproc)
+      sdress = c_alpha(i) * a_s2_i(l_sd, iproc)
       delta_ij_loc(i, minilist(l_sd), 1) += hdress
       delta_ij_loc(i, minilist(l_sd), 2) += sdress
     end do
@@ -249,14 +279,15 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
   integer,intent(in)              :: minilist(n_minilist)
   double precision, intent(inout) :: delta_ij_loc(Nstates,N_det,2)
   double precision, external :: diag_H_mat_elem_fock
-  double precision :: haa, contrib
+  double precision :: haa, contrib, c_alpha(N_states)
 
 
   
   haa = diag_H_mat_elem_fock(psi_det_generators(1,1,i_gen),alpha,fock_diag_tmp_(1,1,iproc),N_int)
   
-  call dress_with_alpha_(Nstates, Ndet, Nint, delta_ij_loc, minilist, det_minilist, n_minilist, alpha, haa, contrib, iproc)
- 
+  call dress_with_alpha_(Nstates, Ndet, Nint, delta_ij_loc, minilist, det_minilist, n_minilist, alpha, haa, contrib, c_alpha, iproc)
+  
+  slave_sum_alpha2(:,iproc) += c_alpha(:)**2
   if(contrib < sb(iproc)%mini) then
     call add_to_selection_buffer(sb(iproc), alpha, contrib)
   end if
