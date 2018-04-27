@@ -62,7 +62,7 @@ subroutine generator_done(i_gen, int_buf, double_buf, det_buf, N_buf, iproc)
     if(sb(iproc)%cur > 0) then
       !$OMP CRITICAL
       call merge_selection_buffers(sb(iproc), mini_sb)
-      call sort_selection_buffer(mini_sb)
+      !call sort_selection_buffer(mini_sb)
       do i=1,Nproc
         sb(i)%mini = min(sb(i)%mini, mini_sb%mini)
       end do
@@ -203,7 +203,7 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
   !global_sum_alpha2(:) -= c_alpha(:,1)
   print *, "SUM ALPHA2 POST", c_alpha(:,1)
   do i=1,N_states
-    delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
+ !   delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
   end do
   global_sum_alpha2 = 0d0 
 end subroutine
