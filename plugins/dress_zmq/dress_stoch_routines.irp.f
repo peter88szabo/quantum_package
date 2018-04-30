@@ -74,7 +74,7 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
     ipos=1
     ntas = 0
     do i=1,N_dress_jobs+1
-      flushme = (i==N_dress_jobs+1 .or. block_i == size(block))
+      flushme = (i==N_dress_jobs+1 .or. block_i == size(block) .or. block_i >=cur_tooth_reduce )
       if(.not. flushme) flushme = (tooth_reduce(dress_jobs(i)) == 0 .or. tooth_reduce(dress_jobs(i)) /= cur_tooth_reduce)
       
       if(flushme .and. block_i > 0) then
@@ -131,16 +131,16 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
       print *,  irp_here, ': Failed in zmq_set_running'
     endif
     
-    !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc)              &
-        !$OMP  PRIVATE(i)
-    i = omp_get_thread_num()
-    if (i==0) then
+    !!$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc)              &
+    !    !$OMP  PRIVATE(i)
+    !i = omp_get_thread_num()
+    !if (i==0) then
       call dress_collector(zmq_socket_pull,E, relative_error, delta, delta_s2, dress,&
           dress_stoch_istate)
-    else
-      call dress_slave_inproc(i)
-    endif
-    !$OMP END PARALLEL
+    !else
+    !  call dress_slave_inproc(i)
+    !endif
+    !!$OMP END PARALLEL
     call end_parallel_job(zmq_to_qp_run_socket, zmq_socket_pull, 'dress')
     
     print *, '========== ================= ================= ================='
@@ -197,7 +197,6 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   integer :: total_computed
   integer :: delta_loc_cur, is, N_buf(3)
   double precision :: fac , wei
-  logical :: ok
   integer, allocatable :: int_buf(:)
   double precision, allocatable :: double_buf(:)
   integer(bit_kind), allocatable :: det_buf(:,:,:)
@@ -275,23 +274,25 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
     do j=1,N_cp !! optimizable
       fac = 0d0
-      ok = .false.
       !fac(i) = cps(inds(i), j) / cps_N(j) * wei(i) * comb_step
       fac = cps(ind, j) * wei * comb_step
       
       if(fac /= 0) then
+        !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i,is)
         do i=1,sparse(0)
         do is=1,N_states
           cp(is,sparse(i),j,1) += delta_loc(is,i,1) * fac
         end do
         end do
+        !$OMP END PARALLEL DO
 
-
+        !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i,is)
         do i=1,sparse(0)
         do is=1,N_states
           cp(is,sparse(i),j,2) += delta_loc(is,i,2) * fac
         end do
         end do
+        !$OMP END PARALLEL DO
       end if 
     end do
        
@@ -304,17 +305,21 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
      if(fracted) fracted = (ind == first_det_of_teeth(toothMwen))
     
      if(fracted .and. .false.) then
+       !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i)
        do i=1,sparse(0)
          delta_det(1:N_states,sparse(i),toothMwen-1, 1) += delta_loc(1:N_states,i,1) * (1d0-fractage(toothMwen))
          delta_det(1:N_states,sparse(i),toothMwen-1, 2) += delta_loc(1:N_states,i,2) * (1d0-fractage(toothMwen))
          delta_det(1:N_states,sparse(i),toothMwen  , 1) += delta_loc(1:N_states,i,1) * (fractage(toothMwen))
          delta_det(1:N_states,sparse(i),toothMwen  , 2) += delta_loc(1:N_states,i,2) * (fractage(toothMwen))
        end do
+       !$OMP END PARALLEL DO
      else if(.false.) then
+       !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i)
        do i=1,sparse(0)
          delta_det(1:N_states,sparse(i),toothMwen  , 1) = delta_loc(1:N_states,i,1)
          delta_det(1:N_states,sparse(i),toothMwen  , 2) = delta_loc(1:N_states,i,2)
        end do
+       !$OMP END PARALLEL DO
      end if
 
      parts_to_get(ind) -= 1
@@ -326,7 +331,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
     time = omp_get_wtime()
     
-    if((time - timeLast > 2d0) .or. (.not. loop)) then
+    if((time - timeLast > 5d0) .or. (.not. loop)) then
       timeLast = time
       cur_cp = N_cp
       
@@ -347,7 +352,8 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
       su  = 0d0
       su2 = 0d0
-      
+      !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, val) SHARED(comb, dress_detail, &
+      !$OMP cur_cp,istate,cps_N) REDUCTION(+:su) REDUCTION(+:su2)
       do i=1, int(cps_N(cur_cp))
         call get_comb_val(comb(i), dress_detail, cur_cp, val, istate)
         su  += val

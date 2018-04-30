@@ -150,28 +150,53 @@ subroutine push_dress_results(zmq_socket_push, ind, last, delta_loc, int_buf, do
       end do
     end do
 
-    rc = f77_zmq_send( zmq_socket_push, sparsei, 4, ZMQ_SNDMORE)
-    if(rc /= 4) stop "push"
-    
+   
     if(sparsei /= 0) then
-      rc = f77_zmq_send( zmq_socket_push, contrib, 8*N_states, ZMQ_SNDMORE)
-      if(rc /= 8*N_states) stop "push"
-      
-      rc = f77_zmq_send( zmq_socket_push, sparse, 4*sparsei, ZMQ_SNDMORE)
-      if(rc /= 4*sparsei) stop "push"
-
-
-      rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,1), 4*N_states*sparsei, ZMQ_SNDMORE)
-      if(rc /= 4*N_states*sparsei) stop "push"
-
-      rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,2), 4*N_states*sparsei, ZMQ_SNDMORE)
-      if(rc /= 4*N_states*sparsei) stop "push"
+      if(sparsei < N_det / 2) then
+        rc = f77_zmq_send( zmq_socket_push, sparsei, 4, ZMQ_SNDMORE)
+        if(rc /= 4) stop "push"
     
-      !do i=sparsei,1
-      !  tmp(:,:) = delta_loc(:,i,:)
-      !  delta_loc(:,i,:) = 0d0
-      !  delta_loc(:,sparse(i),:) = tmp(:,:)
-      !end do
+        rc = f77_zmq_send( zmq_socket_push, contrib, 8*N_states, ZMQ_SNDMORE)
+        if(rc /= 8*N_states) stop "push"
+      
+        rc = f77_zmq_send( zmq_socket_push, sparse, 4*sparsei, ZMQ_SNDMORE)
+        if(rc /= 4*sparsei) stop "push"
+
+
+        rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,1), 4*N_states*sparsei, ZMQ_SNDMORE)
+        if(rc /= 4*N_states*sparsei) stop "push"
+
+        rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,2), 4*N_states*sparsei, ZMQ_SNDMORE)
+        if(rc /= 4*N_states*sparsei) stop "push"
+      else
+        rc = f77_zmq_send( zmq_socket_push, -1, 4, ZMQ_SNDMORE)
+        if(rc /= 4) stop "push"
+    
+        rc = f77_zmq_send( zmq_socket_push, contrib, 8*N_states, ZMQ_SNDMORE)
+        if(rc /= 8*N_states) stop "push"
+        
+        do i=1,N_det
+          sparse(i) = i
+          do k=1,2
+          do l=1,N_states
+            delta_loc4(l,i,k) = real(delta_loc(l,i,k), kind=4)
+          end do
+          end do
+        end do
+
+        !rc = f77_zmq_send( zmq_socket_push, sparse, 4*sparsei, ZMQ_SNDMORE)
+        !if(rc /= 4*sparsei) stop "push"
+
+
+        rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,1), 4*N_states*N_det, ZMQ_SNDMORE)
+        if(rc /= 4*N_states*N_det) stop "push"
+
+        rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,2), 4*N_states*N_det, ZMQ_SNDMORE)
+        if(rc /= 4*N_states*N_det) stop "push"
+      end if
+    else
+      rc = f77_zmq_send( zmq_socket_push, 0, 4, ZMQ_SNDMORE)
+      if(rc /= 4) stop "push"
     end if
 
    
@@ -187,7 +212,7 @@ subroutine push_dress_results(zmq_socket_push, ind, last, delta_loc, int_buf, do
   end if
  
   N_buf = N_bufi
-  N_buf = (/0, 1, 0/)
+  !N_buf = (/0, 1, 0/)
 
   rc = f77_zmq_send( zmq_socket_push, N_buf, 4*3, ZMQ_SNDMORE)
   if(rc /= 4*3) stop "push5" 
@@ -256,10 +281,15 @@ subroutine pull_dress_results(zmq_socket_pull, ind, last, delta_loc, delta_loc4,
     rc = f77_zmq_recv( zmq_socket_pull, contrib, 8*N_states, 0)
     if(rc /= 8*N_states) stop "pullc"
   
-
-    rc = f77_zmq_recv( zmq_socket_pull, sparse(1), 4*sparse(0), 0)
-    if(rc /= 4*sparse(0)) stop "pullc"
-  
+    if(sparse(0) == -1) then
+      do i=1,N_det
+        sparse(i) = i
+      end do
+      sparse(0) = N_det
+    else
+      rc = f77_zmq_recv( zmq_socket_pull, sparse(1), 4*sparse(0), 0)
+      if(rc /= 4*sparse(0)) stop "pullc"
+    end if
  
     rc = f77_zmq_recv( zmq_socket_pull, delta_loc4(1,1,1), N_states*4*sparse(0), 0)
     if(rc /= 4*N_states*sparse(0)) stop "pullc"
