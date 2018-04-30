@@ -108,6 +108,7 @@ subroutine push_dress_results(zmq_socket_push, ind, last, delta_loc, int_buf, do
 
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_push
   double precision, intent(inout)   :: delta_loc(N_states, N_det, 2)
+  real(kind=4), allocatable   :: delta_loc4(:,:,:)
   double precision, intent(in) :: double_buf(*)
   logical, intent(in) :: last
   integer, intent(in) :: int_buf(*)
@@ -115,15 +116,15 @@ subroutine push_dress_results(zmq_socket_push, ind, last, delta_loc, int_buf, do
   integer, intent(in) :: N_bufi(3)
   integer :: N_buf(3)
   integer, intent(in) :: ind, task_id
-  integer :: rc, i, j
+  integer :: rc, i, j, k, l
   double precision :: tmp(N_states,2)
   integer, allocatable :: sparse(:)
   integer :: sparsei
   double precision :: contrib(N_states)
-
+  
   contrib = 0d0
   allocate(sparse(N_det))
-
+  allocate(delta_loc4(N_states, N_det, 2))
 
   rc = f77_zmq_send( zmq_socket_push, ind, 4, ZMQ_SNDMORE)
   if(rc /= 4) stop "push"
@@ -139,8 +140,12 @@ subroutine push_dress_results(zmq_socket_push, ind, last, delta_loc, int_buf, do
         if(delta_loc(j,i,1) /= 0d0 .or. delta_loc(j,i,2) /= 0d0) then
           sparsei += 1
           sparse(sparsei) = i
-          delta_loc(:,sparsei,:) = delta_loc(:,i,:)
-          contrib(:) += delta_loc(:,sparsei, 1) * psi_coef(i, :)
+          do k=1,2
+          do l=1,N_states
+            delta_loc4(l,sparsei,k) = real(delta_loc(l,i,k), kind=4)
+          end do
+          end do
+          contrib(:) += delta_loc(:,i, 1) * psi_coef(i, :)
         end if
       end do
     end do
@@ -156,17 +161,17 @@ subroutine push_dress_results(zmq_socket_push, ind, last, delta_loc, int_buf, do
       if(rc /= 4*sparsei) stop "push"
 
 
-      rc = f77_zmq_send( zmq_socket_push, delta_loc(1,1,1), 8*N_states*sparsei, ZMQ_SNDMORE)
-      if(rc /= 8*N_states*sparsei) stop "push"
+      rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,1), 4*N_states*sparsei, ZMQ_SNDMORE)
+      if(rc /= 4*N_states*sparsei) stop "push"
 
-      rc = f77_zmq_send( zmq_socket_push, delta_loc(1,1,2), 8*N_states*sparsei, ZMQ_SNDMORE)
-      if(rc /= 8*N_states*sparsei) stop "push"
+      rc = f77_zmq_send( zmq_socket_push, delta_loc4(1,1,2), 4*N_states*sparsei, ZMQ_SNDMORE)
+      if(rc /= 4*N_states*sparsei) stop "push"
     
-      do i=sparsei,1
-        tmp(:,:) = delta_loc(:,i,:)
-        delta_loc(:,i,:) = 0d0
-        delta_loc(:,sparse(i),:) = tmp(:,:)
-      end do
+      !do i=sparsei,1
+      !  tmp(:,:) = delta_loc(:,i,:)
+      !  delta_loc(:,i,:) = 0d0
+      !  delta_loc(:,sparse(i),:) = tmp(:,:)
+      !end do
     end if
 
    
@@ -220,7 +225,7 @@ IRP_ENDIF
 end subroutine
 
 
-subroutine pull_dress_results(zmq_socket_pull, ind, last, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, sparse, contrib)
+subroutine pull_dress_results(zmq_socket_pull, ind, last, delta_loc, delta_loc4, int_buf, double_buf, det_buf, N_buf, task_id, sparse, contrib)
   use f77_zmq
   implicit none
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
@@ -232,8 +237,10 @@ subroutine pull_dress_results(zmq_socket_pull, ind, last, delta_loc, int_buf, do
   integer, intent(out) :: sparse(0:N_det)
   integer, intent(out) :: ind
   integer, intent(out) :: task_id
-  integer :: rc, i, sparsen
+  integer :: rc, i, j, k, sparsen
   integer, intent(out) :: N_buf(3)
+  real(kind=4), intent(out) :: delta_loc4(N_states, N_det, 2)
+
 
   
   rc = f77_zmq_recv( zmq_socket_pull, ind, 4, 0)
@@ -254,11 +261,19 @@ subroutine pull_dress_results(zmq_socket_pull, ind, last, delta_loc, int_buf, do
     if(rc /= 4*sparse(0)) stop "pullc"
   
  
-    rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,1,1), N_states*8*sparse(0), 0)
-    if(rc /= 8*N_states*sparse(0)) stop "pullc"
+    rc = f77_zmq_recv( zmq_socket_pull, delta_loc4(1,1,1), N_states*4*sparse(0), 0)
+    if(rc /= 4*N_states*sparse(0)) stop "pullc"
   
-    rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,1,2), N_states*8*sparse(0), 0)
-    if(rc /= 8*N_states*sparse(0)) stop "pulld"
+    rc = f77_zmq_recv( zmq_socket_pull, delta_loc4(1,1,2), N_states*4*sparse(0), 0)
+    if(rc /= 4*N_states*sparse(0)) stop "pulld"
+
+    do j=1,2
+    do i=1,sparse(0)
+    do k=1,N_states
+      delta_loc(k,i,j) = real(delta_loc4(k,i,j), kind=8)
+    end do
+    end do
+    end do
   else
     contrib = 0d0
   end if

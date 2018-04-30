@@ -177,6 +177,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   double precision, intent(out)  :: delta(N_states, N_det)
   double precision, intent(out)  :: delta_s2(N_states, N_det)
   double precision, allocatable  :: delta_loc(:,:,:), delta_det(:,:,:,:)
+  real, allocatable              :: delta_loc4(:,:,:)
   double precision, allocatable  :: dress_detail(:,:)
   double precision               :: dress_mwen(N_states)
   integer(ZMQ_PTR),external      :: new_zmq_to_qp_run_socket
@@ -209,6 +210,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   allocate(delta_det(N_states, N_det, 0:comb_teeth+1, 2))
   allocate(cp(N_states, N_det, N_cp, 2), dress_detail(N_states, N_det))
   allocate(delta_loc(N_states, N_det, 2))
+  allocate(delta_loc4(N_states, N_det, 2))
   dress_detail = 0d0
   delta_det = 0d0
   cp = 0d0
@@ -235,14 +237,20 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   timeLast = time0
   cur_cp = 0
   old_cur_cp = 0
-  logical :: loop, last
+  logical :: loop, last, floop
   integer, allocatable :: sparse(:)
   allocate(sparse(0:N_det))
+  floop = .true.
   loop = .true.
+
   pullLoop : do while (loop)
-    call pull_dress_results(zmq_socket_pull, ind, last, delta_loc(1,1,1), int_buf, double_buf, det_buf, N_buf, task_id, sparse, dress_mwen)
+    call pull_dress_results(zmq_socket_pull, ind, last, delta_loc, delta_loc4, int_buf, double_buf, det_buf, N_buf, task_id, sparse, dress_mwen)
     call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
-    
+    if(floop) then
+      call wall_time(time)
+      print *, "FIRST PULL", time-time0
+      floop = .false.
+    end if
     
  
     integer, external :: zmq_delete_tasks
