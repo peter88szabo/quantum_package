@@ -66,7 +66,7 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
     
     integer(ZMQ_PTR), external     :: new_zmq_to_qp_run_socket
     integer                        :: ipos, sz
-    integer                        :: block(8), block_i, cur_tooth_reduce, ntas
+    integer                        :: block(1), block_i, cur_tooth_reduce, ntas
     logical                        :: flushme
     block = 0
     block_i = 0
@@ -176,8 +176,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
   double precision, intent(out)  :: delta(N_states, N_det)
   double precision, intent(out)  :: delta_s2(N_states, N_det)
-  double precision, allocatable  :: delta_loc(:,:,:), delta_det(:,:,:,:)
-  real, allocatable              :: delta_loc4(:,:,:)
+  double precision, allocatable  :: delta_loc(:,:,:)
   double precision, allocatable  :: dress_detail(:,:)
   double precision               :: dress_mwen(N_states)
   integer(ZMQ_PTR),external      :: new_zmq_to_qp_run_socket
@@ -189,164 +188,78 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   integer :: i, j, k, i_state, N
   integer :: task_id, ind
   double precision, save :: time0 = -1.d0
-  double precision :: time, timeLast, old_tooth
+  double precision :: time
   double precision, external :: omp_get_wtime
-  integer :: cur_cp, old_cur_cp
-  integer, allocatable :: parts_to_get(:)
-  logical, allocatable :: actually_computed(:)
-  integer :: total_computed
+  integer :: cur_cp
   integer :: delta_loc_cur, is, N_buf(3)
-  double precision :: fac , wei
-  integer, allocatable :: int_buf(:)
+  integer, allocatable :: int_buf(:), agreg_for_cp(:)
   double precision, allocatable :: double_buf(:)
   integer(bit_kind), allocatable :: det_buf(:,:,:)
-
+  integer, external :: zmq_delete_tasks
+  
+  allocate(agreg_for_cp(N_cp))
+  agreg_for_cp = 0
   allocate(int_buf(N_dress_int_buffer), double_buf(N_dress_double_buffer), det_buf(N_int,2,N_dress_det_buffer))
   delta_loc_cur = 1
 
   delta = 0d0
   delta_s2 = 0d0
-  allocate(delta_det(N_states, N_det, 0:comb_teeth+1, 2))
   allocate(cp(N_states, N_det, N_cp, 2), dress_detail(N_states, N_det))
   allocate(delta_loc(N_states, N_det, 2))
-  allocate(delta_loc4(N_states, N_det, 2))
-  dress_detail = 0d0
-  delta_det = 0d0
+  dress_detail = -1000d0
   cp = 0d0
-  total_computed = 0
   character*(512) :: task
-  
-  allocate(actually_computed(N_det_generators), parts_to_get(N_det_generators))
-    
-  
-  parts_to_get(:) = 1
-  if(fragment_first > 0) then
-    do i=1,fragment_first
-      parts_to_get(i) = fragment_count
-    enddo
-  endif
-
-  actually_computed = .false.
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
   more = 1
   if (time0 < 0.d0) then
       call wall_time(time0)
   endif
-  timeLast = time0
-  cur_cp = 0
-  old_cur_cp = 0
-  logical :: loop, last, floop
-  integer, allocatable :: sparse(:)
-  allocate(sparse(0:N_det))
+  logical :: loop, floop
+  integer :: finalcp
+  finalcp = N_cp*2
+
   floop = .true.
   loop = .true.
 
   pullLoop : do while (loop)
-    call pull_dress_results(zmq_socket_pull, ind, last, delta_loc, delta_loc4, int_buf, double_buf, det_buf, N_buf, task_id, sparse, dress_mwen)
-    call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
+    call pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, dress_mwen)
     if(floop) then
       call wall_time(time)
       print *, "FIRST PULL", time-time0
       floop = .false.
     end if
     
- 
-    integer, external :: zmq_delete_tasks
     
-    if(last) then
+    if(cur_cp == -1) then
+      call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
       if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,1,more) == -1) then
-          stop 'Unable to delete tasks'
+        stop 'Unable to delete tasks'
       endif
-      if(more == 0) loop = .false.
-    end if
-
-    !dress_mwen = 0d0
-
-    !do i_state=1,N_states
-    !  do i=1,sparse(0)
-    !    dress_mwen(i_state) += delta_loc(i_state, i, 1) * psi_coef(sparse(i), i_state)
-    !  end do
-    !end do
+      !if(more == 0) stop 'loop = .false.' !!!!!!!!!!!!!!!!
+      dress_detail(:, ind) = dress_mwen(:)
+    else if(cur_cp > 0) then
       
-    dress_detail(:, ind) += dress_mwen(:)
-    wei = dress_weight_inv(ind)
-
-    do j=1,N_cp !! optimizable
-      fac = 0d0
-      !fac(i) = cps(inds(i), j) / cps_N(j) * wei(i) * comb_step
-      fac = cps(ind, j) * wei * comb_step
+      if(ind == 0) cycle
       
-      if(fac /= 0) then
-        !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i,is)
-        do i=1,sparse(0)
-        do is=1,N_states
-          cp(is,sparse(i),j,1) += delta_loc(is,i,1) * fac
-        end do
-        end do
-        !$OMP END PARALLEL DO
-
-        !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i,is)
-        do i=1,sparse(0)
-        do is=1,N_states
-          cp(is,sparse(i),j,2) += delta_loc(is,i,2) * fac
-        end do
-        end do
-        !$OMP END PARALLEL DO
-      end if 
-    end do
-       
-    ! do i=1,delta_loc_cur
-     logical :: fracted
-     integer :: toothMwen
-
-     toothMwen = tooth_of_det(ind)
-     fracted = (toothMwen /= 0)
-     if(fracted) fracted = (ind == first_det_of_teeth(toothMwen))
-    
-     if(fracted .and. .false.) then
-       !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i)
-       do i=1,sparse(0)
-         delta_det(1:N_states,sparse(i),toothMwen-1, 1) += delta_loc(1:N_states,i,1) * (1d0-fractage(toothMwen))
-         delta_det(1:N_states,sparse(i),toothMwen-1, 2) += delta_loc(1:N_states,i,2) * (1d0-fractage(toothMwen))
-         delta_det(1:N_states,sparse(i),toothMwen  , 1) += delta_loc(1:N_states,i,1) * (fractage(toothMwen))
-         delta_det(1:N_states,sparse(i),toothMwen  , 2) += delta_loc(1:N_states,i,2) * (fractage(toothMwen))
-       end do
-       !$OMP END PARALLEL DO
-     else if(.false.) then
-       !$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(SHARED) PRIVATE(i)
-       do i=1,sparse(0)
-         delta_det(1:N_states,sparse(i),toothMwen  , 1) = delta_loc(1:N_states,i,1)
-         delta_det(1:N_states,sparse(i),toothMwen  , 2) = delta_loc(1:N_states,i,2)
-       end do
-       !$OMP END PARALLEL DO
-     end if
-
-     parts_to_get(ind) -= 1
-     if(parts_to_get(ind) == 0) then
-       actually_computed(ind) = .true.
-       total_computed += 1
-     end if
-     !end do
-
-    time = omp_get_wtime()
-    
-    if((time - timeLast > 5d0) .or. (.not. loop)) then
-      timeLast = time
-      cur_cp = N_cp
-      
-      do i=1,N_det_generators
-        if(.not. actually_computed(dress_jobs(i))) then
-          if(i /= 1) then
-            cur_cp = done_cp_at(i-1)
-          else
-            cur_cp = 0
-          end if
-          exit
-        end if
+      !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
+      do i=1,N_det
+        cp(:,i,cur_cp,1) += delta_loc(:,i,1)
       end do
-      if(cur_cp == 0 .or. (cur_cp == old_cur_cp .and. total_computed /= N_det_generators)) cycle pullLoop
-      
+
+      !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
+      do i=1,N_det
+        cp(:,i,cur_cp,2) += delta_loc(:,i,2)
+      end do
+
+      agreg_for_cp(cur_cp) += ind
+      if(agreg_for_cp(cur_cp) > needed_by_cp(cur_cp)) then
+        stop "too much results..."
+      end if
+      if(agreg_for_cp(cur_cp) /= needed_by_cp(cur_cp)) cycle
+
+      print *, "FINISHED CP", cur_cp
+
       double precision :: su, su2, eqt, avg, E0, val
       integer, external :: zmq_abort
 
@@ -359,6 +272,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         su  += val
         su2 += val*val
       end do
+      
       avg = su / cps_N(cur_cp)
       eqt = dsqrt( ((su2 / cps_N(cur_cp)) - avg*avg) / cps_N(cur_cp) )
       E0 = sum(dress_detail(istate, :first_det_of_teeth(cp_first_tooth(cur_cp))-1))
@@ -366,47 +280,29 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         E0 = E0 + dress_detail(istate, first_det_of_teeth(cp_first_tooth(cur_cp))) * (1d0-fractage(cp_first_tooth(cur_cp)))
       end if
 
-
       call wall_time(time)
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30)  .or. total_computed == N_det_generators) then
+      
+      print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
+      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == N_cp) then
         ! Termination
-        print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
+        print *, "TERMINATE"
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
           call sleep(1)
           if (zmq_abort(zmq_to_qp_run_socket) == -1) then
             print *, irp_here, ': Error in sending abort signal (2)'
           endif
-        endif
-      else
-        if (cur_cp > old_cur_cp) then
-          old_cur_cp = cur_cp
-          print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
-        endif
+        endif                 
+        !exit pullLoop
       endif
     end if
   end do pullLoop
+  print *, "exited"
+
   
-  delta   (1:N_states,1:N_det) = 0d0
-  delta_s2(1:N_states,1:N_det) = 0d0
+  delta(:,:) = cp(:,:,cur_cp,1)
+  delta_s2(:,:) = cp(:,:,cur_cp,2)
+  
 
-  if(total_computed == N_det_generators) then
-    do i=comb_teeth+1,0,-1
-      delta   (1:N_states,1:N_det) = delta   (1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,1)
-      delta_s2(1:N_states,1:N_det) = delta_s2(1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,2)
-    end do
-  else
-    do i=1,cur_cp
-      delta   (1:N_states,1:N_det) += cp(1:N_states,1:N_det,i,1)
-      delta_s2(1:N_states,1:N_det) += cp(1:N_states,1:N_det,i,2)
-    end do
-    delta   (1:N_states,1:N_det) = delta(1:N_states,1:N_det) / cps_N(cur_cp)
-    delta_s2(1:N_states,1:N_det) = delta_s2(1:N_states,1:N_det) / cps_N(cur_cp)
-    do i=cp_first_tooth(cur_cp)-1,0,-1
-      delta   (1:N_states,1:N_det) = delta   (1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,1)
-      delta_s2(1:N_states,1:N_det) = delta_s2(1:N_states,1:N_det) + delta_det(1:N_states,1:N_det,i,2)
-    end do
-
-  end if
   dress(istate) = E(istate)+E0
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
 end subroutine
@@ -458,6 +354,8 @@ END_PROVIDER
 &BEGIN_PROVIDER [ double precision, cps_N, (N_cps_max) ]
 &BEGIN_PROVIDER [ integer, cp_first_tooth, (N_cps_max) ]
 &BEGIN_PROVIDER [ integer, done_cp_at, (N_det_generators) ]
+&BEGIN_PROVIDER [ integer, done_cp_at_det, (N_det_generators) ]
+&BEGIN_PROVIDER [ integer, needed_by_cp, (0:N_cps_max) ]
 &BEGIN_PROVIDER [ double precision, cps, (N_det_generators, N_cps_max) ]
 &BEGIN_PROVIDER [ integer, N_dress_jobs ]
 &BEGIN_PROVIDER [ integer, dress_jobs, (N_det_generators) ]
@@ -486,6 +384,8 @@ END_PROVIDER
   cps = 0d0
   cur_cp = 1
   done_cp_at = 0
+  done_cp_at_det = 0
+  needed_by_cp = 0
   comp_filler = .false.
   computed = .false.
   cps_N = 1d0
@@ -506,6 +406,7 @@ END_PROVIDER
   end do
   
   l=first_det_of_comb
+  call random_seed(put=(/321,654,65,321,65/))
   call RANDOM_NUMBER(comb)
   lfiller = 1
   nfiller = 1
@@ -574,6 +475,8 @@ END_PROVIDER
   do i=1,N_dress_jobs
     if(done_cp_at(i) /= 0) cur_cp = done_cp_at(i)
     done_cp_at(i) = cur_cp
+    done_cp_at_det(dress_jobs(i)) = cur_cp
+    needed_by_cp(cur_cp) += 1
   end do
   
 
@@ -625,7 +528,7 @@ END_PROVIDER
   end do
 
   do i=1,N_cp-1
-    call isort(dress_jobs(first_cp(i)+1:first_cp(i+1)),iorder,first_cp(i+1)-first_cp(i))
+    call isort(dress_jobs(first_cp(i)+1),iorder,first_cp(i+1)-first_cp(i)-1)
   end do
  
  do i=1,N_det_generators

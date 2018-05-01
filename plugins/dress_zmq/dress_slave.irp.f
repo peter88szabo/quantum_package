@@ -54,12 +54,12 @@ subroutine run_wf
       PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
       PROVIDE psi_bilinear_matrix_transp_order
       
-      !$OMP PARALLEL PRIVATE(i)
-      i = omp_get_thread_num()
-      call dress_slave_tcp(i+1, energy)
-      !$OMP END PARALLEL
+      !!$OMP PARALLEL PRIVATE(i)
+      !i = omp_get_thread_num()
+!       call dress_slave_tcp(i+1, energy)
+      call dress_slave_tcp(0, energy)
+      !!$OMP END PARALLEL
       print *,  'dress done'
-
     endif
 
   end do
