@@ -232,8 +232,10 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
     
     
     if(cur_cp == -1) then
+      !print *, "TASK DEL", task_id
       call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
       if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,1,more) == -1) then
+        print *, "TASK ID", task_id
         stop 'Unable to delete tasks'
       endif
       !if(more == 0) stop 'loop = .false.' !!!!!!!!!!!!!!!!
