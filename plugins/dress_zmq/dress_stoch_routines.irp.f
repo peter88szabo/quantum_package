@@ -227,7 +227,12 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
     if(floop) then
       call wall_time(time)
       print *, "FIRST PULL", time-time0
+      time0 = time
       floop = .false.
+    end if
+    if(cur_cp == -1 .and. ind == N_det_generators) then
+      call wall_time(time)
+      print *, "FINISHED_CPL", N_cp-1, time-time0
     end if
     
     
@@ -260,7 +265,9 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       end if
       if(agreg_for_cp(cur_cp) /= needed_by_cp(cur_cp)) cycle
 
-      print *, "FINISHED CP", cur_cp
+      call wall_time(time)
+      
+      print *, "FINISHED_CP", cur_cp, time-time0
 
       double precision :: su, su2, eqt, avg, E0, val
       integer, external :: zmq_abort
@@ -282,10 +289,9 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         E0 = E0 + dress_detail(istate, first_det_of_teeth(cp_first_tooth(cur_cp))) * (1d0-fractage(cp_first_tooth(cur_cp)))
       end if
 
-      call wall_time(time)
       
       print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == N_cp-4) then
+      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == N_cp) then
         ! Termination
         print *, "TERMINATE"
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
@@ -347,7 +353,7 @@ end function
 ! gen_per_cp : number of generators per checkpoint
   END_DOC
   comb_teeth = 64
-  N_cps_max = 32
+  N_cps_max = 16
   gen_per_cp = (N_det_generators / N_cps_max) + 1
 END_PROVIDER
 
@@ -373,7 +379,6 @@ END_PROVIDER
   integer, allocatable :: filler(:)
   integer :: nfiller, lfiller, cfiller
   logical :: fracted
-
     
   integer :: first_suspect
   first_suspect = 1
@@ -394,11 +399,13 @@ END_PROVIDER
   tooth_reduce = 0
   
   integer :: fragsize
-  fragsize = N_det_generators / ((N_cps_max+1)*(N_cps_max+2)/2)
+  fragsize = N_det_generators / ((N_cps_max-1+1)*(N_cps_max-1+2)/2)
+  print *, "FRAGSIZE", fragsize
 
   do i=1,N_cps_max
     cp_limit(i) = fragsize * i * (i+1) / 2
   end do
+  cp_limit(N_cps_max) = N_det*2
   print *, "CP_LIMIT", cp_limit
 
   N_dress_jobs = first_det_of_comb - 1
@@ -413,12 +420,14 @@ END_PROVIDER
   lfiller = 1
   nfiller = 1
   do i=1,N_det_generators
+    !print *, i, N_dress_jobs
     comb(i) = comb(i) * comb_step
     !DIR$ FORCEINLINE
     call add_comb(comb(i), computed, cps(1, cur_cp), N_dress_jobs, dress_jobs)
     
     !if(N_dress_jobs / gen_per_cp > (cur_cp-1) .or. N_dress_jobs == N_det_generators) then
     if(N_dress_jobs > cp_limit(cur_cp) .or. N_dress_jobs == N_det_generators) then
+      print *, "END CUR_CP", cur_cp, N_dress_jobs
       first_cp(cur_cp+1) = N_dress_jobs
       done_cp_at(N_dress_jobs) = cur_cp
       cps_N(cur_cp) = dfloat(i)
@@ -427,16 +436,35 @@ END_PROVIDER
         cur_cp += 1
       end if
       
-      if (N_dress_jobs == N_det_generators) exit
+      if (N_dress_jobs == N_det_generators) then
+        exit
+      end if
     end if
+
+    !!!!!!!!!!!!!!!!!!!!!!!!
+    if(.FALSE.) then 
+    do l=first_suspect,N_det_generators
+      if((.not. computed(l))) then
+        N_dress_jobs+=1
+        dress_jobs(N_dress_jobs) = l
+        computed(l) = .true.
+        first_suspect = l
+        exit
+      end if
+    end do
     
+    if (N_dress_jobs == N_det_generators) exit
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ELSE
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!
     do l=first_suspect,N_det_generators
       if((.not. computed(l)) .and. (.not. comp_filler(l))) exit
     end do
     first_suspect = l
-    if(l > N_det_generators) exit
+    if(l > N_det_generators) cycle
     
-    cfiller = tooth_of_det(l)
+    cfiller = tooth_of_det(l)-1
     if(cfiller > lfiller) then
       do j=1,nfiller-1
         if(.not. computed(filler(j))) then
@@ -454,6 +482,8 @@ END_PROVIDER
       nfiller += 1
     end if
     comp_filler(l) = .True.
+    end if
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   enddo
 
   
@@ -463,8 +493,9 @@ END_PROVIDER
        dress_jobs(k) = filler(j)
        N_dress_jobs = k
      end if
-      computed(filler(j)) = .true.
+     computed(filler(j)) = .true.
   end do
+
 
   N_cp = cur_cp
   

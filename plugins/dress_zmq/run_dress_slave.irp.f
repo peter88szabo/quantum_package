@@ -46,8 +46,7 @@ subroutine run_dress_slave(thread,iproce,energy)
   integer :: toothMwen
   logical :: fracted
   double precision :: fac
-      
-
+   
 
   if(iproce /= 0) stop "RUN DRESS SLAVE is OMP"
   
@@ -81,6 +80,9 @@ subroutine run_dress_slave(thread,iproce,energy)
   send = .false.
   done_for = 0
 
+  double precision :: hij, sij
+  call i_h_j_s2(psi_det(1,1,1),psi_det(1,1,2),N_int,hij, sij)
+  print *, E0_denominator(1) 
   !$OMP PARALLEL DEFAULT(SHARED) &
   !$OMP PRIVATE(int_buf, double_buf, det_buf, delta_ij_loc, task, task_id) &
   !$OMP PRIVATE(lastSendable, toothMwen, fracted, fac) &
@@ -208,8 +210,10 @@ subroutine run_dress_slave(thread,iproce,energy)
   end do
   do i=0,comb_teeth+1
     call omp_destroy_lock(lck_det(i))
-  end do  
+  end do
+  stop
 end subroutine
+
 
 
 
@@ -228,10 +232,9 @@ subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, 
   integer, intent(in) :: ind, cur_cp, task_id
   integer :: rc, i, j, k, l
   double precision :: contrib(N_states)
+  real(4), allocatable :: r4buf(:,:,:)
   
-
-  
-  rc = f77_zmq_send( zmq_socket_push, ind, 4, ZMQ_SNDMORE)
+    rc = f77_zmq_send( zmq_socket_push, ind, 4, ZMQ_SNDMORE)
   if(rc /= 4) stop "push"
   
   rc = f77_zmq_send( zmq_socket_push, cur_cp, 4, ZMQ_SNDMORE)
@@ -239,14 +242,22 @@ subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, 
   
 
   if(cur_cp /= -1) then
-    rc = f77_zmq_send( zmq_socket_push, delta_loc(1,1,1), 8*N_states*N_det, ZMQ_SNDMORE)
-    if(rc /= 8*N_states*N_det) stop "push"
+    allocate(r4buf(N_states, N_det, 2))
+    do i=1,2
+    do j=1,N_det
+    do k=1,N_states
+       r4buf(k,j,i) = real(delta_loc(k,j,i), 4)
+    end do
+    end do
+    end do
 
-    rc = f77_zmq_send( zmq_socket_push, delta_loc(1,1,2), 8*N_states*N_det, ZMQ_SNDMORE)
-    if(rc /= 8*N_states*N_det) stop "push"
+    rc = f77_zmq_send( zmq_socket_push, r4buf(1,1,1), 4*N_states*N_det, ZMQ_SNDMORE)
+    if(rc /= 4*N_states*N_det) stop "push"
+
+    rc = f77_zmq_send( zmq_socket_push, r4buf(1,1,2), 4*N_states*N_det, ZMQ_SNDMORE)
+    if(rc /= 4*N_states*N_det) stop "push"
   else
     contrib = 0d0
-    
     do i=1,N_det
       contrib(:) += delta_loc(:,i, 1) * psi_coef(i, :)
     end do
@@ -255,7 +266,7 @@ subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, 
     if(rc /= 8*N_states) stop "push"
     
     N_buf = N_bufi
-    !N_buf = (/0,1,0/)
+    N_buf = (/0,1,0/)
 
     rc = f77_zmq_send( zmq_socket_push, N_buf, 4*3, ZMQ_SNDMORE)
     if(rc /= 4*3) stop "push5" 
@@ -294,6 +305,11 @@ IRP_ENDIF
 end subroutine
 
 
+BEGIN_PROVIDER [ real(4), real4buf, (N_states, N_det, 2) ]
+  
+END_PROVIDER
+
+
 subroutine pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, contrib)
   use f77_zmq
   implicit none
@@ -308,8 +324,6 @@ subroutine pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, 
   integer :: rc, i, j, k
   integer, intent(out) :: N_buf(3)
 
-
-  
   rc = f77_zmq_recv( zmq_socket_pull, ind, 4, 0)
   if(rc /= 4) stop "pulla"
  
@@ -320,11 +334,21 @@ subroutine pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, 
   
 
   if(cur_cp /= -1) then
-    rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,1,1), N_states*8*N_det, 0)
-    if(rc /= 8*N_states*N_det) stop "pullc"
+    
+    rc = f77_zmq_recv( zmq_socket_pull, real4buf(1,1,1), N_states*4*N_det, 0)
+    if(rc /= 4*N_states*N_det) stop "pullc"
   
-    rc = f77_zmq_recv( zmq_socket_pull, delta_loc(1,1,2), N_states*8*N_det, 0)
-    if(rc /= 8*N_states*N_det) stop "pulld"
+    rc = f77_zmq_recv( zmq_socket_pull, real4buf(1,1,2), N_states*4*N_det, 0)
+    if(rc /= 4*N_states*N_det) stop "pulld"
+    
+    do i=1,2
+    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j,k)
+    do j=1,N_det
+    do k=1,N_states
+       delta_loc(k,j,i) = real(real4buf(k,j,i), 8)
+    end do
+    end do
+    end do
   else
     rc = f77_zmq_recv( zmq_socket_pull, contrib, 8*N_states, 0)
     if(rc /= 8*N_states) stop "pullc"
