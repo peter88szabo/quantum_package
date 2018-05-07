@@ -9,6 +9,9 @@ subroutine map_save_to_disk(filename,map)
   integer*8                      :: i,k
   integer                        :: j
 
+  integer*8 :: n_elements
+  n_elements = int(map % n_elements,8)
+
 
   if (map % consolidated) then
     stop 'map already consolidated'
@@ -17,11 +20,11 @@ subroutine map_save_to_disk(filename,map)
   call mmap(trim(filename)//'_consolidated_idx', (/ map % map_size + 2_8 /), 8, fd(1), .False., c_pointer(1))
   call c_f_pointer(c_pointer(1),map % consolidated_idx, (/ map % map_size +2_8/))
 
-  call mmap(trim(filename)//'_consolidated_key', (/ map % n_elements /), cache_key_kind, fd(2), .False., c_pointer(2))
-  call c_f_pointer(c_pointer(2),map % consolidated_key, (/ map % n_elements /))
+  call mmap(trim(filename)//'_consolidated_key', (/ n_elements /), cache_key_kind, fd(2), .False., c_pointer(2))
+  call c_f_pointer(c_pointer(2),map % consolidated_key, (/ n_elements /))
 
-  call mmap(trim(filename)//'_consolidated_value', (/ map % n_elements /), integral_kind, fd(3), .False., c_pointer(3))
-  call c_f_pointer(c_pointer(3),map % consolidated_value, (/ map % n_elements /))
+  call mmap(trim(filename)//'_consolidated_value', (/ n_elements /), integral_kind, fd(3), .False., c_pointer(3))
+  call c_f_pointer(c_pointer(3),map % consolidated_value, (/ n_elements /))
 
   if (.not.associated(map%consolidated_key)) then
     stop 'cannot consolidate map : consolidated_key not associated'
@@ -51,9 +54,6 @@ subroutine map_save_to_disk(filename,map)
   enddo
   map % consolidated_idx (map % map_size + 2_8) = k
   map % consolidated = .True.
-
-  integer*8 :: n_elements
-  n_elements = int(map % n_elements,8)
 
   print *,  'Writing data to disk...'
   call msync ( (/ map % map_size + 2_8 /),    8, fd(1), c_pointer(1))
