@@ -214,6 +214,26 @@ end = struct
     | _ -> raise (Invalid_argument (\"Wrong IO type : \"^s))
 
 end
+
+module Perturbation : sig
+  type t [@@deriving sexp]
+  val to_string : t -> string
+  val of_string : string -> t
+end = struct
+  type t = 
+  | EN
+  | Barycentric
+  [@@deriving sexp]
+
+  let to_string = function
+  | EN -> \"EN\"
+  | Barycentric -> \"Barycentric\"
+  let of_string  s = 
+    match (String.lowercase_ascii s) with
+    | \"en\"  -> EN
+    | \"barycentric\" -> Barycentric
+    | _ -> raise (Invalid_argument (\"Wrong Perturbation type : \"^s))
+end
 "
 
 

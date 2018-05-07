@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """configure
 
@@ -242,7 +242,7 @@ def checking(d_dependency):
                 version = check_output("irpf90 -v".split()).strip()
 
                 from distutils.version import LooseVersion
-                if LooseVersion(version) < LooseVersion("1.6.7"):
+                if LooseVersion(version) < LooseVersion("1.7.2"):
                     return 0
                 else:
                     return a

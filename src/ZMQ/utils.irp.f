@@ -785,13 +785,14 @@ integer function zmq_abort(zmq_to_qp_run_socket)
   sze = len(trim(message))
   rc = f77_zmq_send(zmq_to_qp_run_socket, trim(message), sze, 0)
   if (rc /= sze) then
+    print *,  'zmq_abort: rc /= sze', rc, sze
     zmq_abort = -1
     return
   endif
   
   rc = f77_zmq_recv(zmq_to_qp_run_socket, message, 510, 0)
   if (trim(message(1:rc)) /= 'ok') then
-    print *,  'zmq_abort: '//trim(message(1:rc))
+    print *,  'zmq_abort: ', rc, ':', trim(message(1:rc))
     zmq_abort = -1
     return
   endif
