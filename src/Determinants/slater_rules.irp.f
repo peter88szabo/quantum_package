@@ -509,11 +509,12 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
   select case (degree)
     case (2)
       call get_double_excitation(key_i,key_j,exc,phase,Nint)
-      
+      ! Mono alpha, mono beta
       if (exc(0,1,1) == 1) then
-        ! Mono alpha, mono beta
+        if ( (exc(1,1,1) == exc(1,2,2)).and.(exc(1,1,2) == exc(1,2,1)) ) then
+          s2 =  -phase
+        endif
         if(exc(1,1,1) == exc(1,2,2) )then
-         if(exc(1,1,2) == exc(1,2,1)) s2 = -phase !!!!!
          hij = phase * big_array_exchange_integrals(exc(1,1,1),exc(1,1,2),exc(1,2,1))
         else if (exc(1,2,1) ==exc(1,1,2))then
          hij = phase * big_array_exchange_integrals(exc(1,2,1),exc(1,1,1),exc(1,2,2))
@@ -524,8 +525,8 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
              exc(1,2,1),                                              &
              exc(1,2,2) ,mo_integrals_map)
         endif
+      ! Double alpha
       else if (exc(0,1,1) == 2) then
-        ! Double alpha
         hij = phase*(get_mo_bielec_integral(                         &
             exc(1,1,1),                                              &
             exc(2,1,1),                                              &
@@ -536,8 +537,8 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
             exc(2,1,1),                                              &
             exc(2,2,1),                                              &
             exc(1,2,1) ,mo_integrals_map) )
+      ! Double beta
       else if (exc(0,1,2) == 2) then
-        ! Double beta
         hij = phase*(get_mo_bielec_integral(                         &
             exc(1,1,2),                                              &
             exc(2,1,2),                                              &
@@ -553,13 +554,13 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
       call get_mono_excitation(key_i,key_j,exc,phase,Nint)
       !DIR$ FORCEINLINE
       call bitstring_to_list_ab(key_i, occ, n_occ_ab, Nint)
+      ! Mono alpha
       if (exc(0,1,1) == 1) then
-        ! Mono alpha
         m = exc(1,1,1)
         p = exc(1,2,1)
         spin = 1
+      ! Mono beta
       else
-        ! Mono beta
         m = exc(1,1,2)
         p = exc(1,2,2)
         spin = 2
@@ -567,7 +568,7 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
       call get_mono_excitation_from_fock(key_i,key_j,p,m,spin,phase,hij)
       
     case (0)
-      print *," ZERO"
+      print *,irp_here,": ZERO"
       double precision, external :: diag_S_mat_elem
       s2 = diag_S_mat_elem(key_i,Nint)
       hij = diag_H_mat_elem(key_i,Nint)

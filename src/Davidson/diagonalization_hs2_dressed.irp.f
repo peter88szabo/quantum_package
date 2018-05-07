@@ -35,7 +35,7 @@ subroutine davidson_diag_hs2(dets_in,u_in,s2_out,dim_in,energies,sze,N_st,N_st_d
   double precision, intent(inout) :: u_in(dim_in,N_st_diag)
   double precision, intent(out)  :: energies(N_st_diag), s2_out(N_st_diag)
   integer, intent(in)            :: dressing_state
-  double precision, allocatable  :: H_jj(:), S2_jj(:)
+  double precision, allocatable  :: H_jj(:)
   
   double precision, external     :: diag_H_mat_elem, diag_S_mat_elem
   integer                        :: i,k
@@ -44,7 +44,7 @@ subroutine davidson_diag_hs2(dets_in,u_in,s2_out,dim_in,energies,sze,N_st,N_st_d
   ASSERT (Nint > 0)
   ASSERT (Nint == N_int)
   PROVIDE mo_bielec_integrals_in_map
-  allocate(H_jj(sze),S2_jj(sze))
+  allocate(H_jj(sze))
   
   H_jj(1) = diag_h_mat_elem(dets_in(1,1,1),Nint)
   !$OMP PARALLEL DEFAULT(NONE)                                       &
@@ -60,13 +60,13 @@ subroutine davidson_diag_hs2(dets_in,u_in,s2_out,dim_in,energies,sze,N_st,N_st_d
   if (dressing_state > 0) then
     do k=1,N_st
       do i=1,sze
-        H_jj(i) += u_in(i,k) * dressing_column_h(i,k)
+        H_jj(i)  += u_in(i,k) * dressing_column_h(i,k)
       enddo
     enddo
   endif
 
   call davidson_diag_hjj_sjj(dets_in,u_in,H_jj,S2_out,energies,dim_in,sze,N_st,N_st_diag,Nint,dressing_state)
-  deallocate (H_jj,S2_jj)
+  deallocate (H_jj)
 end
 
 
@@ -254,9 +254,9 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
           dressing_column_h, size(dressing_column_h,1), s_tmp, size(s_tmp,1), &
           1.d0, W(1,shift+1), size(W,1))
 
-        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
-          dressing_column_s, size(dressing_column_s,1), s_tmp, size(s_tmp,1), &
-          1.d0, S(1,shift+1), size(S,1))
+!        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
+!          dressing_column_s, size(dressing_column_s,1), s_tmp, size(s_tmp,1), &
+!          1.d0, S(1,shift+1), size(S,1))
 
 
         call dgemm('T','N', N_st, N_st_diag, sze, 1.d0, &
@@ -267,13 +267,13 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
           psi_coef, size(psi_coef,1), s_tmp, size(s_tmp,1), &
           1.d0, W(1,shift+1), size(W,1))
 
-        call dgemm('T','N', N_st, N_st_diag, sze, 1.d0, &
-          dressing_column_s, size(dressing_column_s,1), &
-          U(1,shift+1), size(U,1), 0.d0, s_tmp, size(s_tmp,1))
-
-        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
-          psi_coef, size(psi_coef,1), s_tmp, size(s_tmp,1), &
-          1.d0, S(1,shift+1), size(S,1))
+!        call dgemm('T','N', N_st, N_st_diag, sze, 1.d0, &
+!          dressing_column_s, size(dressing_column_s,1), &
+!          U(1,shift+1), size(U,1), 0.d0, s_tmp, size(s_tmp,1))
+!
+!        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
+!          psi_coef, size(psi_coef,1), s_tmp, size(s_tmp,1), &
+!          1.d0, S(1,shift+1), size(S,1))
 
       endif
 

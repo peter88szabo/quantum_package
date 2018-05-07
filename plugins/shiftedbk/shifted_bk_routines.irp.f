@@ -4,6 +4,7 @@
 &BEGIN_PROVIDER [ double precision, a_s2_i, (N_det, Nproc) ]
   implicit none
   current_generator_(:) = 0
+  fock_diag_tmp_(:,:,:) = 0.d0
   a_h_i = 0d0
   a_s2_i = 0d0
  END_PROVIDER
@@ -52,7 +53,7 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
 
 
   do i=1,Nstates
-    de = E0_denominator(i) - haa
+    de = dress_E0_denominator(i) - haa
     if(DABS(de) < 1D-5) cycle
 
     c_alpha = a_h_psi(i) / de
@@ -75,24 +76,5 @@ BEGIN_PROVIDER [ logical, initialize_E0_denominator ]
     initialize_E0_denominator = .True.
 END_PROVIDER
 
-
-BEGIN_PROVIDER [ double precision, E0_denominator, (N_states) ]
-  implicit none
-  BEGIN_DOC
-  ! E0 in the denominator of the PT2
-  END_DOC
-  if (initialize_E0_denominator) then
-   if (h0_type == "EN") then
-     E0_denominator(1:N_states) = psi_energy(1:N_states)
-   else if (h0_type == "Barycentric") then
-     E0_denominator(1:N_states) = barycentric_electronic_energy(1:N_states)
-   else
-     print *,  h0_type, ' not implemented'
-     stop
-   endif
-  else
-    E0_denominator = -huge(1.d0)
-  endif
-END_PROVIDER
 
 
