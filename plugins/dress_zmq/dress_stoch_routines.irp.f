@@ -369,7 +369,7 @@ end function
 ! gen_per_cp : number of generators per checkpoint
   END_DOC
   comb_teeth = 64
-  N_cps_max = 64
+  N_cps_max = 256
   gen_per_cp = (N_det_generators / N_cps_max) + 1
 END_PROVIDER
 
