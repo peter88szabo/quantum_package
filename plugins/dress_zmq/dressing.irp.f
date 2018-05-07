@@ -78,7 +78,7 @@ BEGIN_PROVIDER [ double precision, delta_ij, (N_states,N_det,2) ]
 
   delta_ij = 0d0
 
-  E_CI_before(:) = dress_E0_denominator(:) + nuclear_repulsion
+  E_CI_before(:) = psi_energy(:) + nuclear_repulsion
   threshold_selectors = 1.d0
   threshold_generators = 1d0 
 !  if(errr /= 0d0) then
