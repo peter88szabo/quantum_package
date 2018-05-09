@@ -343,6 +343,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
       endif
     end if
   end do pullLoop
+!<<<<<<< HEAD
 
   if(tooth == comb_teeth+1) then
     pt2(pt2_stoch_istate) = sum(pt2_detail(pt2_stoch_istate,:))
@@ -356,6 +357,15 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
     error(pt2_stoch_istate) = sqrt(1d0 / (Nabove(tooth)-1) * abs(sum2above(tooth) / Nabove(tooth) - (sumabove(tooth)/Nabove(tooth))**2))
   end if
   
+!=======
+! 
+!  E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
+!  prop = ((1d0 - dfloat(comb_teeth - tooth + 1) * comb_step) - pt2_cweight(first_det_of_teeth(tooth)-1))
+!  prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))
+!  E0 += pt2_detail(pt2_stoch_istate,first_det_of_teeth(tooth)) * prop
+!  pt2(pt2_stoch_istate) = E0 + (sumabove(tooth) / Nabove(tooth))
+!
+!>>>>>>> master
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call sort_selection_buffer(b)
 end subroutine

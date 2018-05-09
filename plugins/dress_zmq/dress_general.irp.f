@@ -1,5 +1,3 @@
-
-
 subroutine run_dressing(N_st,energy)
   implicit none
   

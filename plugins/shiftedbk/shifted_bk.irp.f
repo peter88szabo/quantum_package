@@ -1,4 +1,3 @@
-
 program shifted_bk
   implicit none
   BEGIN_DOC

@@ -4,7 +4,7 @@ BEGIN_PROVIDER [ integer, fragment_first ]
 END_PROVIDER
 
 
-subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
+subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
   use f77_zmq
   
   implicit none
@@ -15,9 +15,11 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
   integer, external              :: omp_get_thread_num
   double precision, intent(in)   :: E(N_states), relative_error
   double precision, intent(out)  :: dress(N_states)
-  double precision, intent(out)  :: delta(N_states, N_det)
-  double precision, intent(out)  :: delta_s2(N_states, N_det)
+  double precision, intent(out)  :: delta_out(N_states, N_det)
+  double precision, intent(out)  :: delta_s2_out(N_states, N_det)
   
+  double precision, allocatable  :: delta(:,:)
+  double precision, allocatable  :: delta_s2(:,:)
   
   integer                        :: i, j, k, Ncp
   
@@ -29,6 +31,7 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
   
   task(:) = CHAR(0)
   temp(:) = CHAR(0)
+  allocate(delta(N_states,N_det), delta_s2(N_det,N_states))
   state_average_weight_save(:) = state_average_weight(:)
   do dress_stoch_istate=1,N_states
     SOFT_TOUCH dress_stoch_istate
@@ -141,6 +144,8 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
     !  call dress_slave_inproc(i)
     !endif
     !!$OMP END PARALLEL
+    delta_out(dress_stoch_istate,1:N_det) = delta(dress_stoch_istate,1:N_det)
+    delta_s2_out(dress_stoch_istate,1:N_det) = delta_s2_out(dress_stoch_istate,1:N_det)
     call end_parallel_job(zmq_to_qp_run_socket, zmq_socket_pull, 'dress')
     
     print *, '========== ================= ================= ================='
@@ -148,6 +153,7 @@ subroutine ZMQ_dress(E, dress, delta, delta_s2, relative_error)
   FREE dress_stoch_istate
   state_average_weight(:) = state_average_weight_save(:)
   TOUCH state_average_weight
+  deallocate(delta,delta_s2)
   
 end subroutine
 
@@ -289,7 +295,6 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         E0 = E0 + dress_detail(istate, first_det_of_teeth(cp_first_tooth(cur_cp))) * (1d0-fractage(cp_first_tooth(cur_cp)))
       end if
 
-      
       print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
       if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == N_cp) then
         ! Termination

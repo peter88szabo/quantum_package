@@ -55,35 +55,16 @@ END_PROVIDER
 
   if (diag_algorithm == "Davidson") then
     
-    allocate (eigenvectors(size(CI_eigenvectors_dressed,1),size(CI_eigenvectors_dressed,2)),&
-        eigenvectors_s2(size(CI_eigenvectors_dressed,1),size(CI_eigenvectors_dressed,2)),&
-        eigenvalues(size(CI_electronic_energy_dressed,1)))
     do j=1,min(N_states,N_det)
       do i=1,N_det
-        eigenvectors(i,j) = psi_coef(i,j)
+        CI_eigenvectors_dressed(i,j) = psi_coef(i,j)
       enddo
     enddo
-    do mrcc_state=1,N_states
-      do j=mrcc_state,min(N_states,N_det)
-        do i=1,N_det
-          eigenvectors(i,j) = psi_coef(i,j)
-        enddo
-      enddo
-      call davidson_diag_HS2(psi_det,eigenvectors, eigenvectors_s2,    &
-          size(eigenvectors,1),                                        &
-          eigenvalues,N_det,min(N_det,N_states),min(N_det,N_states_diag),N_int,&
-          mrcc_state)
-      CI_eigenvectors_dressed(1:N_det,mrcc_state) = eigenvectors(1:N_det,mrcc_state)
-      CI_electronic_energy_dressed(mrcc_state) = eigenvalues(mrcc_state)
-    enddo
-    do k=N_states+1,N_states_diag
-      CI_eigenvectors_dressed(1:N_det,k) = eigenvectors(1:N_det,k)
-      CI_electronic_energy_dressed(k) = eigenvalues(k)
-    enddo
+    call davidson_diag_HS2(psi_det,CI_eigenvectors_dressed, CI_eigenvectors_s2_dressed,&
+        size(CI_eigenvectors_dressed,1), CI_electronic_energy_dressed,&
+        N_det,min(N_det,N_states),min(N_det,N_states_diag),N_int,1)
     call u_0_S2_u_0(CI_eigenvectors_s2_dressed,CI_eigenvectors_dressed,N_det,psi_det,N_int,&
         N_states_diag,size(CI_eigenvectors_dressed,1))
-    
-    deallocate (eigenvectors,eigenvalues)
     
     
   else if (diag_algorithm == "Lapack") then
@@ -91,30 +72,81 @@ END_PROVIDER
     allocate (eigenvectors(size(H_matrix_dressed,1),N_det))
     allocate (eigenvalues(N_det))
 
-    do j=1,min(N_states,N_det)
-      do i=1,N_det
-        eigenvectors(i,j) = psi_coef(i,j)
-      enddo
-    enddo
-    do mrcc_state=1,N_states
-      do j=mrcc_state,min(N_states,N_det)
-        do i=1,N_det
-          eigenvectors(i,j) = psi_coef(i,j)
-        enddo
-      enddo
-
     call lapack_diag(eigenvalues,eigenvectors,                         &
-        H_matrix_dressed(1,1,mrcc_state),size(H_matrix_dressed,1),N_det)
-      CI_eigenvectors_dressed(1:N_det,mrcc_state) = eigenvectors(1:N_det,mrcc_state)
-      CI_electronic_energy_dressed(mrcc_state) = eigenvalues(mrcc_state)
-    enddo
-    do k=N_states+1,N_states_diag
-      CI_eigenvectors_dressed(1:N_det,k) = eigenvectors(1:N_det,k)
-      CI_electronic_energy_dressed(k) = eigenvalues(k)
-    enddo
-    call u_0_S2_u_0(CI_eigenvectors_s2_dressed,CI_eigenvectors_dressed,N_det,psi_det,N_int,&
-        N_states_diag,size(CI_eigenvectors_dressed,1))
+        H_matrix_dressed,size(H_matrix_dressed,1),N_det)
+     CI_electronic_energy_dressed(:) = 0.d0
+     if (s2_eig) then
+       i_state = 0
+       allocate (s2_eigvalues(N_det))
+       allocate(index_good_state_array(N_det),good_state_array(N_det))
+       good_state_array = .False.
 
+       call u_0_S2_u_0(s2_eigvalues,eigenvectors,N_det,psi_det,N_int,&
+                  N_det,size(eigenvectors,1))
+       do j=1,N_det
+         ! Select at least n_states states with S^2 values closed to "expected_s2"
+         if(dabs(s2_eigvalues(j)-expected_s2).le.0.5d0)then
+           i_state +=1
+           index_good_state_array(i_state) = j
+           good_state_array(j) = .True.
+         endif
+         if(i_state.eq.N_states) then
+           exit
+         endif
+       enddo
+       if(i_state .ne.0)then
+         ! Fill the first "i_state" states that have a correct S^2 value
+         do j = 1, i_state
+           do i=1,N_det
+             CI_eigenvectors_dressed(i,j) = eigenvectors(i,index_good_state_array(j))
+           enddo
+           CI_electronic_energy_dressed(j) = eigenvalues(index_good_state_array(j))
+           CI_eigenvectors_s2_dressed(j) = s2_eigvalues(index_good_state_array(j))
+         enddo
+         i_other_state = 0
+         do j = 1, N_det
+           if(good_state_array(j))cycle
+           i_other_state +=1
+           if(i_state+i_other_state.gt.n_states_diag)then
+             exit
+           endif
+           do i=1,N_det
+             CI_eigenvectors_dressed(i,i_state+i_other_state) = eigenvectors(i,j)
+           enddo
+           CI_electronic_energy_dressed(i_state+i_other_state) = eigenvalues(j)
+           CI_eigenvectors_s2_dressed(i_state+i_other_state) = s2_eigvalues(i_state+i_other_state)
+         enddo
+       else
+         print*,''
+         print*,'!!!!!!!!   WARNING  !!!!!!!!!'
+         print*,'  Within the ',N_det,'determinants selected'
+         print*,'  and the ',N_states_diag,'states requested'
+         print*,'  We did not find any state with S^2 values close to ',expected_s2
+         print*,'  We will then set the first N_states eigenvectors of the H matrix'
+         print*,'  as the CI_eigenvectors_dressed'
+         print*,'  You should consider more states and maybe ask for s2_eig to be .True. or just enlarge the CI space'
+         print*,''
+         do j=1,min(N_states_diag,N_det)
+           do i=1,N_det
+             CI_eigenvectors_dressed(i,j) = eigenvectors(i,j)
+           enddo
+           CI_electronic_energy_dressed(j) = eigenvalues(j)
+           CI_eigenvectors_s2_dressed(j) = s2_eigvalues(j)
+         enddo
+       endif
+       deallocate(index_good_state_array,good_state_array)
+       deallocate(s2_eigvalues)
+     else
+       call u_0_S2_u_0(CI_eigenvectors_s2_dressed,eigenvectors,N_det,psi_det,N_int,&
+          min(N_det,N_states_diag),size(eigenvectors,1))
+       ! Select the "N_states_diag" states of lowest energy
+       do j=1,min(N_det,N_states_diag)
+         do i=1,N_det
+           CI_eigenvectors_dressed(i,j) = eigenvectors(i,j)
+         enddo
+         CI_electronic_energy_dressed(j) = eigenvalues(j)
+       enddo
+     endif
     deallocate(eigenvectors,eigenvalues)
   endif
 
@@ -137,24 +169,23 @@ end
 
 
 
-BEGIN_PROVIDER [ double precision, h_matrix_dressed, (N_det,N_det,N_states) ]
+BEGIN_PROVIDER [ double precision, h_matrix_dressed, (N_det,N_det) ]
  implicit none
  BEGIN_DOC
  ! Dressed H with Delta_ij
  END_DOC
- integer                        :: i, j, ii,jj, dressing_state
- do dressing_state = 1,N_states
-   do j=1,N_det
-     do i=1,N_det
-       h_matrix_dressed(i,j,dressing_state) = h_matrix_all_dets(i,j) 
-     enddo
-   enddo
-   i = dressed_column_idx(dressing_state)
-   do j = 1, N_det
-     h_matrix_dressed(i,j,dressing_state) += dressing_column_h(j,dressing_state)
-     h_matrix_dressed(j,i,dressing_state) += dressing_column_h(j,dressing_state)
-   enddo
-   h_matrix_dressed(i,i,dressing_state) -= dressing_column_h(i,dressing_state)
- enddo
+ integer                        :: i, j, k
+
+  h_matrix_dressed(1:N_det,1:N_det) = h_matrix_all_dets(1:N_det,1:N_det)
+  do k=1,N_states
+    do j=1,N_det
+      do i=1,N_det
+        h_matrix_dressed(i,j) = h_matrix_dressed(i,j) +             &
+            0.5d0 * (dressing_column_h(i,k) * psi_coef(j,k) + &
+                     dressing_column_h(j,k) * psi_coef(i,k))
+      enddo
+    enddo
+  enddo
+
 END_PROVIDER
 

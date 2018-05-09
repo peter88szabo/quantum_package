@@ -38,7 +38,7 @@ subroutine davidson_diag_hs2(dets_in,u_in,s2_out,dim_in,energies,sze,N_st,N_st_d
   double precision, allocatable  :: H_jj(:), S2_jj(:)
   
   double precision, external     :: diag_H_mat_elem, diag_S_mat_elem
-  integer                        :: i
+  integer                        :: i,k
   ASSERT (N_st > 0)
   ASSERT (sze > 0)
   ASSERT (Nint > 0)
@@ -58,7 +58,11 @@ subroutine davidson_diag_hs2(dets_in,u_in,s2_out,dim_in,energies,sze,N_st,N_st_d
   !$OMP END PARALLEL
 
   if (dressing_state > 0) then
-    H_jj(dressed_column_idx(dressing_state)) += dressing_column_h(dressed_column_idx(dressing_state),dressing_state)
+    do k=1,N_st
+      do i=1,sze
+        H_jj(i) += u_in(i,k) * dressing_column_h(i,k)
+      enddo
+    enddo
   endif
 
   call davidson_diag_hjj_sjj(dets_in,u_in,H_jj,S2_out,energies,dim_in,sze,N_st,N_st_diag,Nint,dressing_state)
@@ -150,17 +154,17 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
   do i=1,N_st
     write_buffer = trim(write_buffer)//' ================ =========== ==========='
   enddo
-  write(6,'(A)') write_buffer(1:6+41*N_states)
+  write(6,'(A)') write_buffer(1:6+41*N_st)
   write_buffer = 'Iter'
   do i=1,N_st
     write_buffer = trim(write_buffer)//'       Energy          S^2       Residual '
   enddo
-  write(6,'(A)') write_buffer(1:6+41*N_states)
+  write(6,'(A)') write_buffer(1:6+41*N_st)
   write_buffer = '====='
   do i=1,N_st
     write_buffer = trim(write_buffer)//' ================ =========== ==========='
   enddo
-  write(6,'(A)') write_buffer(1:6+41*N_states)
+  write(6,'(A)') write_buffer(1:6+41*N_st)
   
 
   allocate(                                                          &
@@ -242,17 +246,35 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
       
       if (dressing_state > 0) then
 
-        l = dressed_column_idx(dressing_state)
-        do istate=1,N_st_diag
-          do i=1,sze
-              W(i,shift+istate) += dressing_column_h(i,dressing_state) * U(l,shift+istate)
-              S(i,shift+istate) += dressing_column_s(i,dressing_state) * U(l,shift+istate)
-              W(l,shift+istate) += dressing_column_h(i,dressing_state) * U(i,shift+istate)
-              S(l,shift+istate) += dressing_column_s(i,dressing_state) * U(i,shift+istate)
-          enddo
-          W(l,shift+istate) -= dressing_column_h(l,dressing_state) * U(l,shift+istate)
-          S(l,shift+istate) -= dressing_column_s(l,dressing_state) * U(l,shift+istate)
-        enddo
+        call dgemm('T','N', N_st, N_st_diag, sze, 1.d0, &
+          psi_coef, size(psi_coef,1), &
+          U(1,shift+1), size(U,1), 0.d0, s_tmp, size(s_tmp,1))
+
+        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
+          dressing_column_h, size(dressing_column_h,1), s_tmp, size(s_tmp,1), &
+          1.d0, W(1,shift+1), size(W,1))
+
+        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
+          dressing_column_s, size(dressing_column_s,1), s_tmp, size(s_tmp,1), &
+          1.d0, S(1,shift+1), size(S,1))
+
+
+        call dgemm('T','N', N_st, N_st_diag, sze, 1.d0, &
+          dressing_column_h, size(dressing_column_h,1), &
+          U(1,shift+1), size(U,1), 0.d0, s_tmp, size(s_tmp,1))
+
+        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
+          psi_coef, size(psi_coef,1), s_tmp, size(s_tmp,1), &
+          1.d0, W(1,shift+1), size(W,1))
+
+        call dgemm('T','N', N_st, N_st_diag, sze, 1.d0, &
+          dressing_column_s, size(dressing_column_s,1), &
+          U(1,shift+1), size(U,1), 0.d0, s_tmp, size(s_tmp,1))
+
+        call dgemm('N','N', sze, N_st_diag, N_st, 0.5d0, &
+          psi_coef, size(psi_coef,1), s_tmp, size(s_tmp,1), &
+          1.d0, S(1,shift+1), size(S,1))
+
       endif
 
       ! Compute h_kl = <u_k | W_l> = <u_k| H |u_l>
