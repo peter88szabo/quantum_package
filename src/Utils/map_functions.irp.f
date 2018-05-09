@@ -103,7 +103,6 @@ subroutine map_load_from_disk(filename,map)
     n_elements = int(k - l, 4)
     key_p => map % consolidated_key   (l:l+n_elements)
     value_p => map % consolidated_value ( l:l+n_elements )
-    print *,  i, n_elements
     map % map(i) % key   => key_p
     map % map(i) % value => value_p
     map % map(i) % sorted = .True.
