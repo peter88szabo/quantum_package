@@ -122,14 +122,6 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
         block(block_i) = dress_jobs(i)
       end if
     end do
-    print *, "ACTUAL TASK NUM", ntas
-    !stop
-
-    !if (ipos > 1) then
-    !  if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
-    !    stop 'Unable to add task to task server'
-    !  endif
-    !endif
     if (zmq_set_running(zmq_to_qp_run_socket) == -1) then
       print *,  irp_here, ': Failed in zmq_set_running'
     endif
@@ -196,7 +188,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   double precision, save :: time0 = -1.d0
   double precision :: time
   double precision, external :: omp_get_wtime
-  integer :: cur_cp
+  integer :: cur_cp, last_cp
   integer :: delta_loc_cur, is, N_buf(3)
   integer, allocatable :: int_buf(:), agreg_for_cp(:)
   double precision, allocatable :: double_buf(:)
@@ -222,8 +214,6 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       call wall_time(time0)
   endif
   logical :: loop, floop
-  integer :: finalcp
-  finalcp = N_cp*2
 
   floop = .true.
   loop = .true.
@@ -232,29 +222,23 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
     call pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, dress_mwen)
     if(floop) then
       call wall_time(time)
-      print *, "FIRST PULL", time-time0
       time0 = time
       floop = .false.
     end if
     if(cur_cp == -1 .and. ind == N_det_generators) then
       call wall_time(time)
-      print *, "FINISHED_CPL", N_cp-1, time-time0
     end if
     
     
     if(cur_cp == -1) then
-      !print *, "TASK DEL", task_id
       call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
       if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,1,more) == -1) then
-        print *, "TASK ID", task_id
         stop 'Unable to delete tasks'
       endif
-      !if(more == 0) stop 'loop = .false.' !!!!!!!!!!!!!!!!
+      if(more == 0)  loop = .false. !stop 'loop = .false.' !!!!!!!!!!!!!!!!
       dress_detail(:, ind) = dress_mwen(:)
     else if(cur_cp > 0) then
-      
       if(ind == 0) cycle
-      
       !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
       do i=1,N_det
         cp(:,i,cur_cp,1) += delta_loc(:,i,1)
@@ -273,8 +257,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
       call wall_time(time)
       
-      print *, "FINISHED_CP", cur_cp, time-time0
-
+      last_cp = cur_cp
       double precision :: su, su2, eqt, avg, E0, val
       integer, external :: zmq_abort
 
@@ -296,7 +279,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       end if
 
       print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == N_cp) then
+      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == cur_cp-2) then
         ! Termination
         print *, "TERMINATE"
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
@@ -305,18 +288,14 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
             print *, irp_here, ': Error in sending abort signal (2)'
           endif
         endif                 
-        exit pullLoop
       endif
     end if
   end do pullLoop
-  print *, "exited"
 
+  delta(:,:) = cp(:,:,last_cp,1)
+  delta_s2(:,:) = cp(:,:,last_cp,2)
   
-  delta(:,:) = cp(:,:,cur_cp,1)
-  delta_s2(:,:) = cp(:,:,cur_cp,2)
-  
-
-  dress(istate) = E(istate)+E0
+  dress(istate) = E(istate)+E0+avg
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
 end subroutine
 
@@ -405,13 +384,11 @@ END_PROVIDER
   
   integer :: fragsize
   fragsize = N_det_generators / ((N_cps_max-1+1)*(N_cps_max-1+2)/2)
-  print *, "FRAGSIZE", fragsize
 
   do i=1,N_cps_max
     cp_limit(i) = fragsize * i * (i+1) / 2
   end do
   cp_limit(N_cps_max) = N_det*2
-  print *, "CP_LIMIT", cp_limit
 
   N_dress_jobs = first_det_of_comb - 1
   do i=1, N_dress_jobs
@@ -420,7 +397,7 @@ END_PROVIDER
   end do
   
   l=first_det_of_comb
-  call random_seed(put=(/321,654,65,321,65/))
+  call random_seed(put=(/321,654,65,321,65,321,654,65,321,65321,654,65,321,65321,654,65,321,65321,654,65,321,65/))
   call RANDOM_NUMBER(comb)
   lfiller = 1
   nfiller = 1
@@ -432,7 +409,6 @@ END_PROVIDER
     
     !if(N_dress_jobs / gen_per_cp > (cur_cp-1) .or. N_dress_jobs == N_det_generators) then
     if(N_dress_jobs > cp_limit(cur_cp) .or. N_dress_jobs == N_det_generators) then
-      print *, "END CUR_CP", cur_cp, N_dress_jobs
       first_cp(cur_cp+1) = N_dress_jobs
       done_cp_at(N_dress_jobs) = cur_cp
       cps_N(cur_cp) = dfloat(i)

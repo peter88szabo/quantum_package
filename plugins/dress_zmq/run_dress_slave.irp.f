@@ -81,8 +81,10 @@ subroutine run_dress_slave(thread,iproce,energy)
   done_for = 0
 
   double precision :: hij, sij
-  call i_h_j_s2(psi_det(1,1,1),psi_det(1,1,2),N_int,hij, sij)
-  print *, E0_denominator(1) 
+  !call i_h_j_s2(psi_det(1,1,1),psi_det(1,1,2),N_int,hij, sij)
+  
+  hij = E0_denominator(1)  !PROVIDE BEFORE OMP PARALLEL
+
   !$OMP PARALLEL DEFAULT(SHARED) &
   !$OMP PRIVATE(int_buf, double_buf, det_buf, delta_ij_loc, task, task_id) &
   !$OMP PRIVATE(lastSendable, toothMwen, fracted, fac) &
@@ -93,7 +95,6 @@ subroutine run_dress_slave(thread,iproce,energy)
   zmq_socket_push      = new_zmq_push_socket(thread)
   call connect_to_taskserver(zmq_to_qp_run_socket,worker_id,thread)
   if(worker_id == -1) then
-    print *, "WORKER -1"
     call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
     call end_zmq_push_socket(zmq_socket_push,thread)
     stop "WORKER -1"
@@ -106,18 +107,54 @@ subroutine run_dress_slave(thread,iproce,energy)
   allocate(det_buf(N_int, 2, N_dress_det_buffer)) 
   allocate(delta_ij_loc(N_states,N_det,2)) 
   do
-    !!1$OMP CRITICAL (SENDAGE)
     call get_task_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id, task)
-    !!1$OMP END CRITICAL (SENDAGE)
     task = task//"  0"
-    if(task_id == 0) then
-      print *, "DONEDONE"
-      exit   !! LAST MESSAGE ???
+    if(task_id == 0) exit
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if(task_id /= 0) then
+      read (task,*) subset, i_generator
+
+      !$OMP ATOMIC
+      done_for(done_cp_at_det(i_generator)) += 1
+
+      delta_ij_loc(:,:,:) = 0d0
+      call generator_start(i_generator, iproc)
+      call alpha_callback(delta_ij_loc, i_generator, subset, iproc)
+      call generator_done(i_generator, int_buf, double_buf, det_buf, N_buf, iproc)
+     
+      do i=1,N_cp
+        fac = cps(i_generator, i) * dress_weight_inv(i_generator) * comb_step
+        if(fac == 0d0) cycle
+        call omp_set_lock(lck_sto(i))
+        cp(:,:,i,1) += (delta_ij_loc(:,:,1) * fac)
+        cp(:,:,i,2) += (delta_ij_loc(:,:,2) * fac)
+        call omp_unset_lock(lck_sto(i))
+      end do
+
+
+      toothMwen = tooth_of_det(i_generator)
+      fracted = (toothMwen /= 0)
+      if(fracted) fracted = (i_generator == first_det_of_teeth(toothMwen))
+      if(fracted) then
+        call omp_set_lock(lck_det(toothMwen))
+        call omp_set_lock(lck_det(toothMwen-1))
+        delta_det(:,:,toothMwen-1, 1) += delta_ij_loc(:,:,1) * (1d0-fractage(toothMwen))
+        delta_det(:,:,toothMwen-1, 2) += delta_ij_loc(:,:,2) * (1d0-fractage(toothMwen))
+        delta_det(:,:,toothMwen  , 1) += delta_ij_loc(:,:,1) * (fractage(toothMwen))
+        delta_det(:,:,toothMwen  , 2) += delta_ij_loc(:,:,2) * (fractage(toothMwen))
+        call omp_unset_lock(lck_det(toothMwen))
+        call omp_unset_lock(lck_det(toothMwen-1)) 
+      else
+        call omp_set_lock(lck_det(toothMwen))
+        delta_det(:,:,toothMwen  , 1) += delta_ij_loc(:,:,1)
+        delta_det(:,:,toothMwen  , 2) += delta_ij_loc(:,:,2)
+        call omp_unset_lock(lck_det(toothMwen))
+      end if
+      call push_dress_results(zmq_socket_push, i_generator, -1, delta_ij_loc, int_buf, double_buf, det_buf, N_buf, task_id)
+      call task_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id)
+      lastCp(iproc) = done_cp_at_det(i_generator) 
     end if
-    read (task,*) subset, i_generator
-    
-    
-    if(done_cp_at_det(i_generator) < lastCp(iproc)) stop 'loop = .false.'
+
     !$OMP CRITICAL
     send = .false.
     lastSendable = N_cp*2
@@ -125,18 +162,17 @@ subroutine run_dress_slave(thread,iproce,energy)
       lastSendable = min(lastCp(i), lastSendable)
     end do
     lastSendable -= 1
-    if(lastSendable > lastSent) then
+    if(lastSendable > lastSent .or. (lastSendable == N_cp-1 .and. lastSent /= N_cp-1)) then
       lastSent = lastSendable
+      cur_cp = lastSent
       send = .true.
     end if
     !$OMP END CRITICAL
-     
+    
     if(send) then
-      !!1$OMP CRITICAL
       N_buf = (/0,1,0/)
-  
+
       delta_ij_loc = 0d0
-      cur_cp = lastSent
       if(cur_cp < 1) stop "cur_cp < 1"
       do i=1,cur_cp
         delta_ij_loc(:,:,:) += cp(:,:,i,:)
@@ -146,61 +182,13 @@ subroutine run_dress_slave(thread,iproce,energy)
       do i=cp_first_tooth(cur_cp)-1,0,-1
         delta_ij_loc(:,:,:) = delta_ij_loc(:,:,:) +delta_det(:,:,i,:)
       end do
-      !!1$OMP END CRITICAL
-      !!1$OMP CRITICAL (SENDAGE)
       call push_dress_results(zmq_socket_push, done_for(cur_cp), cur_cp, delta_ij_loc, int_buf, double_buf, det_buf, N_buf, -1)
-      !!1$OMP END CRITICAL (SENDAGE)
     end if
 
-
-    !$OMP ATOMIC
-    done_for(done_cp_at_det(i_generator)) += 1
-
-    delta_ij_loc(:,:,:) = 0d0
-    call generator_start(i_generator, iproc)
-    call alpha_callback(delta_ij_loc, i_generator, subset, iproc)
-    call generator_done(i_generator, int_buf, double_buf, det_buf, N_buf, iproc)
-     
-    !!1$OMP CRITICAL
-    do i=1,N_cp
-      fac = cps(i_generator, i) * dress_weight_inv(i_generator) * comb_step
-      if(fac == 0d0) cycle
-      call omp_set_lock(lck_sto(i))
-      cp(:,:,i,1) += (delta_ij_loc(:,:,1) * fac)
-      cp(:,:,i,2) += (delta_ij_loc(:,:,2) * fac)
-      call omp_unset_lock(lck_sto(i))
-    end do
-
-
-    toothMwen = tooth_of_det(i_generator)
-    fracted = (toothMwen /= 0)
-    if(fracted) fracted = (i_generator == first_det_of_teeth(toothMwen))
-    if(fracted) then
-      call omp_set_lock(lck_det(toothMwen))
-      call omp_set_lock(lck_det(toothMwen-1))
-      delta_det(:,:,toothMwen-1, 1) += delta_ij_loc(:,:,1) * (1d0-fractage(toothMwen))
-      delta_det(:,:,toothMwen-1, 2) += delta_ij_loc(:,:,2) * (1d0-fractage(toothMwen))
-      delta_det(:,:,toothMwen  , 1) += delta_ij_loc(:,:,1) * (fractage(toothMwen))
-      delta_det(:,:,toothMwen  , 2) += delta_ij_loc(:,:,2) * (fractage(toothMwen))
-      call omp_unset_lock(lck_det(toothMwen))
-      call omp_unset_lock(lck_det(toothMwen-1)) 
-    else
-      call omp_set_lock(lck_det(toothMwen))
-      delta_det(:,:,toothMwen  , 1) += delta_ij_loc(:,:,1)
-      delta_det(:,:,toothMwen  , 2) += delta_ij_loc(:,:,2)
-      call omp_unset_lock(lck_det(toothMwen))
-    end if 
-    !!!&$OMP END CRITICAL
-
-    !!1$OMP CRITICAL (SENDAGE)
-    call push_dress_results(zmq_socket_push, i_generator, -1, delta_ij_loc, int_buf, double_buf, det_buf, N_buf, task_id)
-    call task_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id)
-    !!1$OMP END CRITICAL (SENDAGE)
-    lastCp(iproc) = done_cp_at_det(i_generator) 
+    if(task_id == 0) exit
   end do
   
-  call sleep(10) 
-  call disconnect_from_taskserver(zmq_to_qp_run_socket,zmq_socket_push,worker_id)
+  call disconnect_from_taskserver(zmq_to_qp_run_socket,worker_id)
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call end_zmq_push_socket(zmq_socket_push,thread)
   !$OMP END PARALLEL
@@ -211,7 +199,6 @@ subroutine run_dress_slave(thread,iproce,energy)
   do i=0,comb_teeth+1
     call omp_destroy_lock(lck_det(i))
   end do
-  stop
 end subroutine
 
 
@@ -220,7 +207,8 @@ end subroutine
 subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_bufi, task_id)
   use f77_zmq
   implicit none
-
+  
+  integer, parameter :: sendt = 4
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_push
   double precision, intent(inout)   :: delta_loc(N_states, N_det, 2)
   real(kind=4), allocatable   :: delta_loc4(:,:,:)
@@ -232,7 +220,7 @@ subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, 
   integer, intent(in) :: ind, cur_cp, task_id
   integer :: rc, i, j, k, l
   double precision :: contrib(N_states)
-  real(4), allocatable :: r4buf(:,:,:)
+  real(sendt), allocatable :: r4buf(:,:,:)
   
     rc = f77_zmq_send( zmq_socket_push, ind, 4, ZMQ_SNDMORE)
   if(rc /= 4) stop "push"
@@ -246,16 +234,16 @@ subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, 
     do i=1,2
     do j=1,N_det
     do k=1,N_states
-       r4buf(k,j,i) = real(delta_loc(k,j,i), 4)
+       r4buf(k,j,i) = real(delta_loc(k,j,i), sendt)
     end do
     end do
     end do
 
-    rc = f77_zmq_send( zmq_socket_push, r4buf(1,1,1), 4*N_states*N_det, ZMQ_SNDMORE)
-    if(rc /= 4*N_states*N_det) stop "push"
+    rc = f77_zmq_send( zmq_socket_push, r4buf(1,1,1), sendt*N_states*N_det, ZMQ_SNDMORE)
+    if(rc /= sendt*N_states*N_det) stop "push"
 
-    rc = f77_zmq_send( zmq_socket_push, r4buf(1,1,2), 4*N_states*N_det, ZMQ_SNDMORE)
-    if(rc /= 4*N_states*N_det) stop "push"
+    rc = f77_zmq_send( zmq_socket_push, r4buf(1,1,2), sendt*N_states*N_det, ZMQ_SNDMORE)
+    if(rc /= sendt*N_states*N_det) stop "push"
   else
     contrib = 0d0
     do i=1,N_det
@@ -266,7 +254,7 @@ subroutine push_dress_results(zmq_socket_push, ind, cur_cp, delta_loc, int_buf, 
     if(rc /= 8*N_states) stop "push"
     
     N_buf = N_bufi
-    N_buf = (/0,1,0/)
+    !N_buf = (/0,1,0/)
 
     rc = f77_zmq_send( zmq_socket_push, N_buf, 4*3, ZMQ_SNDMORE)
     if(rc /= 4*3) stop "push5" 
@@ -313,6 +301,7 @@ END_PROVIDER
 subroutine pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, contrib)
   use f77_zmq
   implicit none
+  integer, parameter :: sendt = 4
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
   integer, intent(out) :: cur_cp
   double precision, intent(inout) :: delta_loc(N_states, N_det, 2)
@@ -335,11 +324,11 @@ subroutine pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, 
 
   if(cur_cp /= -1) then
     
-    rc = f77_zmq_recv( zmq_socket_pull, real4buf(1,1,1), N_states*4*N_det, 0)
-    if(rc /= 4*N_states*N_det) stop "pullc"
+    rc = f77_zmq_recv( zmq_socket_pull, real4buf(1,1,1), N_states*sendt*N_det, 0)
+    if(rc /= sendt*N_states*N_det) stop "pullc"
   
-    rc = f77_zmq_recv( zmq_socket_pull, real4buf(1,1,2), N_states*4*N_det, 0)
-    if(rc /= 4*N_states*N_det) stop "pulld"
+    rc = f77_zmq_recv( zmq_socket_pull, real4buf(1,1,2), N_states*sendt*N_det, 0)
+    if(rc /= sendt*N_states*N_det) stop "pulld"
     
     do i=1,2
     !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j,k)

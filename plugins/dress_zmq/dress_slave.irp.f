@@ -56,7 +56,6 @@ subroutine run_wf
 !       call dress_slave_tcp(i+1, energy)
       call dress_slave_tcp(0, energy)
       !!$OMP END PARALLEL
-      print *,  'dress done'
     endif
 
   end do

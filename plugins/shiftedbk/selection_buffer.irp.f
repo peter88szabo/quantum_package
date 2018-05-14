@@ -8,7 +8,6 @@ subroutine create_selection_buffer(N, siz_, res)
 
   integer :: siz
   siz = max(siz_,1)
- 
   allocate(res%det(N_int, 2, siz), res%val(siz))
 
   res%val(:) = 0d0
@@ -17,19 +16,6 @@ subroutine create_selection_buffer(N, siz_, res)
   res%mini = 0d0
   res%cur = 0
 end subroutine
-
-subroutine reset_selection_buffer(res)
-  use selection_types
-  implicit none
-
-  type(selection_buffer), intent(out) :: res
-
-  res%val(:) = 0d0
-  res%det(:,:,:) = 0_8
-  res%mini = 0d0
-  res%cur = 0
-end subroutine
-
 
 subroutine delete_selection_buffer(b)
   use selection_types
@@ -53,7 +39,7 @@ subroutine add_to_selection_buffer(b, det, val)
   double precision, intent(in) :: val
   integer :: i
 
-  if(b%N > 0 .and. val < b%mini) then
+  if(b%N > 0 .and. val <= b%mini) then
     b%cur += 1
     b%det(1:N_int,1:2,b%cur) = det(1:N_int,1:2)
     b%val(b%cur) = val

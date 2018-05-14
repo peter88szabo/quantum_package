@@ -33,7 +33,6 @@ END_PROVIDER
  END_PROVIDER
 
 
-<<<<<<< HEAD
  BEGIN_PROVIDER [ integer, N_dress_int_buffer ]
 &BEGIN_PROVIDER [ integer, N_dress_double_buffer ]
 &BEGIN_PROVIDER [ integer, N_dress_det_buffer ]
@@ -197,14 +196,15 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
     c_alpha(:,1) += c_alpha(:,i)
   end do
   
-  delta_ij_tmp(:,:,:) -= delta_ij_loc(:,:,:,1)
+  delta_ij_tmp(:,:,1) -= delta_ij_loc(:,:,1,1)
+  delta_ij_tmp(:,:,2) -= delta_ij_loc(:,:,2,1) 
   
-  
-  print *, "SUM ALPHA2  PRE", global_sum_alpha2
+  !print *, "SUM ALPHA2  PRE", global_sum_alpha2
   !global_sum_alpha2(:) -= c_alpha(:,1)
-  print *, "SUM ALPHA2 POST", c_alpha(:,1)
+  print *, "SUM C_ALPHA^2 ", global_sum_alpha2(:)
+  print *, "*** DRESSINS DIVIDED BY 1+SUM C_ALPHA^2 ***"
   do i=1,N_states
- !   delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
+    delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
   end do
   global_sum_alpha2 = 0d0 
 end subroutine
@@ -257,6 +257,10 @@ subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minili
     do l_sd=1,n_minilist
       hdress = c_alpha(i) * a_h_i(l_sd, iproc)
       sdress = c_alpha(i) * a_s2_i(l_sd, iproc)
+      !if(c_alpha(i) * a_s2_i(l_sd, iproc) > 1d-1) then
+      !  call debug_det(det_minilist(1,1,l_sd), N_int)
+      !  call debug_det(alpha,N_int)
+      !end if
       delta_ij_loc(i, minilist(l_sd), 1) += hdress
       delta_ij_loc(i, minilist(l_sd), 2) += sdress
     end do
