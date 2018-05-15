@@ -271,7 +271,7 @@ def write_ezfio(res, filename):
     #
 
     # INPUT
-    # {% for lanel,zcore, l_block in l_atom  $}
+    # {% for label,zcore, l_block in l_atom  $}
     #       #local l_block l=0}
     #       {label} GEN {zcore} {len(l_block)-1 #lmax_block}
     #       {% for l_param in l_block%}
@@ -335,6 +335,7 @@ def write_ezfio(res, filename):
         matrix_unlocal_unpad = [atom[1:] for atom in matrix]
         l_max_block = max(len(i) for i in matrix_unlocal_unpad)
         k_max = max([len(item) for row in matrix_unlocal_unpad for item in row])
+
 
         matrix_unlocal_semipaded = [[pad(item, k_max, [0., 2, 0.]) for item in row] for row in matrix_unlocal_unpad]
 
