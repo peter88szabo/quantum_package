@@ -4,11 +4,12 @@ BEGIN_PROVIDER [ integer, fragment_first ]
 END_PROVIDER
 
 
-subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
+subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error, lndet)
   use f77_zmq
   
   implicit none
   
+  integer, intent(in) :: lndet
   character(len=64000)           :: task
   character(len=3200)            :: temp 
   integer(ZMQ_PTR)               :: zmq_to_qp_run_socket, zmq_socket_pull
@@ -27,11 +28,9 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
   double precision               :: time
   integer, external              :: add_task_to_taskserver
   double precision               :: state_average_weight_save(N_states)
-  
-  
   task(:) = CHAR(0)
   temp(:) = CHAR(0)
-  allocate(delta(N_states,N_det), delta_s2(N_det,N_states))
+  allocate(delta(N_states,N_det), delta_s2(N_states, N_det))
   state_average_weight_save(:) = state_average_weight(:)
   do dress_stoch_istate=1,N_states
     SOFT_TOUCH dress_stoch_istate
@@ -39,14 +38,14 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
     state_average_weight(dress_stoch_istate) = 1.d0
     TOUCH state_average_weight
     
+    !provide psi_coef_generators
     provide nproc fragment_first fragment_count mo_bielec_integrals_in_map mo_mono_elec_integral dress_weight psi_selectors
-    
+    !print *, dress_e0_denominator
     
     print *, '========== ================= ================= ================='
     print *, ' Samples        Energy         Stat. Error         Seconds      '
     print *, '========== ================= ================= ================='
-    
-    
+   
     call new_parallel_job(zmq_to_qp_run_socket,zmq_socket_pull, 'dress')
     
     integer, external              :: zmq_put_psi
@@ -54,6 +53,7 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
     integer, external              :: zmq_put_N_det_selectors
     integer, external              :: zmq_put_dvector
     integer, external              :: zmq_set_running
+
     if (zmq_put_psi(zmq_to_qp_run_socket,1) == -1) then
       stop 'Unable to put psi on ZMQ server'
     endif
@@ -66,7 +66,14 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
     if (zmq_put_dvector(zmq_to_qp_run_socket,1,'energy',dress_e0_denominator,size(dress_e0_denominator)) == -1) then
       stop 'Unable to put energy on ZMQ server'
     endif
-    
+    if (zmq_put_dvector(zmq_to_qp_run_socket,1,"state_average_weight",state_average_weight,N_states) == -1) then
+      stop 'Unable to put state_average_weight on ZMQ server'
+    endif
+    if (zmq_put_dvector(zmq_to_qp_run_socket,1,"dress_stoch_istate",real(dress_stoch_istate,8),1) == -1) then
+      stop 'Unable to put dress_stoch_istate on ZMQ server'
+    endif
+
+
     integer(ZMQ_PTR), external     :: new_zmq_to_qp_run_socket
     integer                        :: ipos, sz
     integer                        :: block(1), block_i, cur_tooth_reduce, ntas
@@ -131,13 +138,13 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
     !i = omp_get_thread_num()
     !if (i==0) then
       call dress_collector(zmq_socket_pull,E, relative_error, delta, delta_s2, dress,&
-          dress_stoch_istate)
+         dress_stoch_istate)
     !else
     !  call dress_slave_inproc(i)
     !endif
     !!$OMP END PARALLEL
     delta_out(dress_stoch_istate,1:N_det) = delta(dress_stoch_istate,1:N_det)
-    delta_s2_out(dress_stoch_istate,1:N_det) = delta_s2_out(dress_stoch_istate,1:N_det)
+    delta_s2_out(dress_stoch_istate,1:N_det) = delta_s2(dress_stoch_istate,1:N_det)
     call end_parallel_job(zmq_to_qp_run_socket, zmq_socket_pull, 'dress')
     
     print *, '========== ================= ================= ================='
@@ -194,7 +201,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
   double precision, allocatable :: double_buf(:)
   integer(bit_kind), allocatable :: det_buf(:,:,:)
   integer, external :: zmq_delete_tasks
-  
+  last_cp = 10000000
   allocate(agreg_for_cp(N_cp))
   agreg_for_cp = 0
   allocate(int_buf(N_dress_int_buffer), double_buf(N_dress_double_buffer), det_buf(N_int,2,N_dress_det_buffer))
@@ -222,6 +229,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
     call pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, dress_mwen)
     if(floop) then
       call wall_time(time)
+      print *, "first_pull", time-time0
       time0 = time
       floop = .false.
     end if
@@ -237,6 +245,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       endif
       if(more == 0)  loop = .false. !stop 'loop = .false.' !!!!!!!!!!!!!!!!
       dress_detail(:, ind) = dress_mwen(:)
+      !print *, "DETAIL", ind, dress_mwen
     else if(cur_cp > 0) then
       if(ind == 0) cycle
       !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
@@ -248,8 +257,9 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       do i=1,N_det
         cp(:,i,cur_cp,2) += delta_loc(:,i,2)
       end do
-
+      !$OMP END PARALLEL DO
       agreg_for_cp(cur_cp) += ind
+      !print *, agreg_for_cp(cur_cp), ind,  needed_by_cp(cur_cp), cur_cp
       if(agreg_for_cp(cur_cp) > needed_by_cp(cur_cp)) then
         stop "too much results..."
       end if
@@ -270,6 +280,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         su  += val
         su2 += val*val
       end do
+      !$OMP END PARALLEL DO
       
       avg = su / cps_N(cur_cp)
       eqt = dsqrt( ((su2 / cps_N(cur_cp)) - avg*avg) / cps_N(cur_cp) )
@@ -278,8 +289,9 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         E0 = E0 + dress_detail(istate, first_det_of_teeth(cp_first_tooth(cur_cp))) * (1d0-fractage(cp_first_tooth(cur_cp)))
       end if
 
-      print '(2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30) .or. cur_cp == cur_cp-2) then
+      !print '(I2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
+       print '(G10.3, 2X, F16.10, 2X, G16.3, 2X, F16.4, A20)', cps_N(cur_cp), avg+E0+E(istate), eqt, time-time0, ''
+      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30)) then
         ! Termination
         print *, "TERMINATE"
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
@@ -294,7 +306,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
   delta(:,:) = cp(:,:,last_cp,1)
   delta_s2(:,:) = cp(:,:,last_cp,2)
-  
+
   dress(istate) = E(istate)+E0+avg
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
 end subroutine
@@ -365,6 +377,7 @@ END_PROVIDER
   logical :: fracted
     
   integer :: first_suspect
+  provide psi_coef_generators
   first_suspect = 1
 
   allocate(filler(n_det_generators))
@@ -397,7 +410,7 @@ END_PROVIDER
   end do
   
   l=first_det_of_comb
-  call random_seed(put=(/321,654,65,321,65,321,654,65,321,65321,654,65,321,65321,654,65,321,65321,654,65,321,65/))
+  call random_seed(put=(/321,654,65,321,65,321,654,65,321,6321,654,65,321,621,654,65,321,65,654,65,321,65/))
   call RANDOM_NUMBER(comb)
   lfiller = 1
   nfiller = 1

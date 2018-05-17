@@ -116,7 +116,7 @@ subroutine run_dress_slave(thread,iproce,energy)
 
       !$OMP ATOMIC
       done_for(done_cp_at_det(i_generator)) += 1
-
+     ! print *, "IGEN", i_generator, done_cp_at_det(i_generator)
       delta_ij_loc(:,:,:) = 0d0
       call generator_start(i_generator, iproc)
       call alpha_callback(delta_ij_loc, i_generator, subset, iproc)
@@ -175,12 +175,14 @@ subroutine run_dress_slave(thread,iproce,energy)
       delta_ij_loc = 0d0
       if(cur_cp < 1) stop "cur_cp < 1"
       do i=1,cur_cp
-        delta_ij_loc(:,:,:) += cp(:,:,i,:)
+        delta_ij_loc(:,:,1) += cp(:,:,i,1)
+        delta_ij_loc(:,:,2) += cp(:,:,i,2)
       end do
 
       delta_ij_loc(:,:,:) = delta_ij_loc(:,:,:) / cps_N(cur_cp)
       do i=cp_first_tooth(cur_cp)-1,0,-1
-        delta_ij_loc(:,:,:) = delta_ij_loc(:,:,:) +delta_det(:,:,i,:)
+        delta_ij_loc(:,:,1) = delta_ij_loc(:,:,1) +delta_det(:,:,i,1)
+        delta_ij_loc(:,:,2) = delta_ij_loc(:,:,2) +delta_det(:,:,i,2)
       end do
       call push_dress_results(zmq_socket_push, done_for(cur_cp), cur_cp, delta_ij_loc, int_buf, double_buf, det_buf, N_buf, -1)
     end if

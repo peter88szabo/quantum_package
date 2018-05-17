@@ -196,16 +196,17 @@ subroutine undress_with_alpha(old_generators, old_det_gen, alpha, n_alpha)
     c_alpha(:,1) += c_alpha(:,i)
   end do
   
-  delta_ij_tmp(:,:,1) -= delta_ij_loc(:,:,1,1)
-  delta_ij_tmp(:,:,2) -= delta_ij_loc(:,:,2,1) 
+
+  delta_ij_tmp(:,:,1) -=  delta_ij_loc(:,:,1,1)
+  delta_ij_tmp(:,:,2) -=  delta_ij_loc(:,:,2,1) 
   
   !print *, "SUM ALPHA2  PRE", global_sum_alpha2
   !global_sum_alpha2(:) -= c_alpha(:,1)
-  print *, "SUM C_ALPHA^2 ", global_sum_alpha2(:)
-  print *, "*** DRESSINS DIVIDED BY 1+SUM C_ALPHA^2 ***"
-  do i=1,N_states
-    delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
-  end do
+  print *, "SUM C_ALPHA^2 =", global_sum_alpha2(:)
+  !print *, "*** DRESSINS DIVIDED BY 1+SUM C_ALPHA^2 ***"
+  !do i=1,N_states
+  !  delta_ij_tmp(i,:,:) = delta_ij_tmp(i,:,:) / (1d0 + global_sum_alpha2(i))
+  !end do
   global_sum_alpha2 = 0d0 
 end subroutine
 
