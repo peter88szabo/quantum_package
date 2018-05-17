@@ -41,7 +41,7 @@ subroutine map_save_to_disk(filename,map)
   call map_sort(map)
   k = 1_8
   do i=0_8, map % map_size
-    map % consolidated_idx (i+1) = k
+    map % consolidated_idx (i+1_8) = k
     do j=1, map % map(i) % n_elements
       map % consolidated_value(k) = map % map(i) % value(j)
       map % consolidated_key  (k) = map % map(i) % key(j)
@@ -49,8 +49,8 @@ subroutine map_save_to_disk(filename,map)
     enddo
     deallocate(map % map(i) % value)
     deallocate(map % map(i) % key)
-    map % map(i) % value => map % consolidated_value ( map % consolidated_idx (i+1_8) :)
-    map % map(i) % key   => map % consolidated_key   ( map % consolidated_idx (i+1_8) :)
+    map % map(i) % value => map % consolidated_value ( map % consolidated_idx (i+1_8) : k-1)
+    map % map(i) % key   => map % consolidated_key   ( map % consolidated_idx (i+1_8) : k-1)
   enddo
   map % consolidated_idx (map % map_size + 2_8) = k
   map % consolidated = .True.
