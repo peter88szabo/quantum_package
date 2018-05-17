@@ -63,8 +63,18 @@ BEGIN_PROVIDER [ double precision, dress_norm_acc, (0:N_det, N_states) ]
 END_PROVIDER
 
 
+BEGIN_PROVIDER [ integer , N_det_delta_ij ]
+  implicit none
+  !N_det_delta_ij = 0!N_det
+END_PROVIDER
 
-BEGIN_PROVIDER [ double precision, delta_ij, (N_states,N_det,2) ]
+BEGIN_PROVIDER [ double precision, delta_ij, (N_states, N_det, 2) ]
+  implicit none
+  if(.true.) delta_ij(:,:N_det_delta_ij, :) = delta_ij_tmp(:,:,:)
+  delta_ij(:,N_det_delta_ij+1:,:) = 0d0
+END_PROVIDER
+
+BEGIN_PROVIDER [ double precision, delta_ij_tmp, (N_states,N_det_delta_ij,2) ]
   use bitmasks
   implicit none
 
@@ -72,29 +82,34 @@ BEGIN_PROVIDER [ double precision, delta_ij, (N_states,N_det,2) ]
   
   double precision, allocatable  :: dress(:), del(:,:), del_s2(:,:)
   double precision               :: E_CI_before(N_states), relative_error
-!  double precision, save         :: errr = 0d0
 
-  allocate(dress(N_states), del(N_states, N_det), del_s2(N_states, N_det))
-
-  delta_ij = 0d0
-
-  E_CI_before(:) = psi_energy(:) + nuclear_repulsion
-  threshold_selectors = 1.d0
-  threshold_generators = 1d0 
-!  if(errr /= 0d0) then
-!    errr = errr / 2d0 
-!  else
-!    errr = 1d-4
-!  end if
-  relative_error = 1.d-4
-  call write_double(6,relative_error,"Convergence of the stochastic algorithm")
-
-  call ZMQ_dress(E_CI_before, dress, del, del_s2, abs(relative_error))
-  delta_ij(:,:,1) = del(:,:)
-  delta_ij(:,:,2) = del_s2(:,:)
-
-  deallocate(dress, del, del_s2)
+  ! prevents re-providing if delta_ij_tmp is
+  ! just being copied
+  if(N_det_delta_ij == N_det) then
   
+    allocate(dress(N_states), del(N_states, N_det_delta_ij), del_s2(N_states, N_det_delta_ij))
+
+    delta_ij_tmp = 0d0
+
+    E_CI_before(:) = psi_energy(:) + nuclear_repulsion
+    threshold_selectors = 1.d0
+    threshold_generators = 1.d0 
+  !  if(errr /= 0d0) then
+  !    errr = errr / 2d0 
+  !  else
+  !    errr = 1d-4
+  !  end if
+    relative_error = 5.d-5
+
+    call write_double(6,relative_error,"Convergence of the stochastic algorithm")
+    
+    call ZMQ_dress(E_CI_before, dress, del, del_s2, abs(relative_error), N_det_delta_ij)
+    delta_ij_tmp(:,:,1) = del(:,:)
+    delta_ij_tmp(:,:,2) = del_s2(:,:)
+
+
+    deallocate(dress, del, del_s2)
+  end if
 END_PROVIDER
 
 

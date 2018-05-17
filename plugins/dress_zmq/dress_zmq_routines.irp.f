@@ -2,6 +2,8 @@ subroutine dress_zmq()
   implicit none
   double precision, allocatable  :: energy(:)
   allocate (energy(N_states))
+  threshold_selectors = 1.d0
+  threshold_generators = 1d0 
 
   read_wf = .True.
   SOFT_TOUCH read_wf

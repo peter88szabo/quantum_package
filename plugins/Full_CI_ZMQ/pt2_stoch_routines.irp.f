@@ -269,7 +269,6 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
       parts_to_get(index(i)) -= 1
       if(parts_to_get(index(i)) < 0) then 
         print *, i, index(i), parts_to_get(index(i))
-        print *, "PARTS ??"
         print *, parts_to_get
         stop "PARTS ??"
       end if
@@ -295,7 +294,12 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
       end do
       
       integer, external :: zmq_abort
-
+      double precision :: E0, avg, prop
+      
+      call do_carlo(tbc, Ncomb+1-firstTBDcomb, comb(firstTBDcomb), pt2_detail, actually_computed, sumabove, sum2above, Nabove)
+      firstTBDcomb = int(Nabove(1)) - orgTBDcomb + 1
+      call get_first_tooth(actually_computed, tooth)
+      
       if (firstTBDcomb > Ncomb) then
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
           call sleep(1)
@@ -305,12 +309,8 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
         endif
         exit pullLoop
       endif
-
-      double precision :: E0, avg, prop
-      call do_carlo(tbc, Ncomb+1-firstTBDcomb, comb(firstTBDcomb), pt2_detail, actually_computed, sumabove, sum2above, Nabove)
-      firstTBDcomb = int(Nabove(1)) - orgTBDcomb + 1
-      if(Nabove(1) < 5d0) cycle
-      call get_first_tooth(actually_computed, tooth)
+     
+     !if(Nabove(1) < 5d0) cycle
      
       E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
       if (tooth <= comb_teeth) then
@@ -323,7 +323,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
         eqt = 0.d0
       endif
       call wall_time(time)
-      if ( (dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error) ) then
+      if ( (dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error) .and. Nabove(tooth) >= 30) then
         ! Termination
         pt2(pt2_stoch_istate) = avg
         error(pt2_stoch_istate) = eqt
@@ -336,19 +336,36 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
         endif
       else
         if (Nabove(tooth) > Nabove_old) then
+          print *, loop
           print '(G10.3, 2X, F16.10, 2X, G16.3, 2X, F16.4, A20)', Nabove(tooth), avg+E, eqt, time-time0, ''
           Nabove_old = Nabove(tooth)
         endif
       endif
     end if
   end do pullLoop
-  
-  E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
-  prop = ((1d0 - dfloat(comb_teeth - tooth + 1) * comb_step) - pt2_cweight(first_det_of_teeth(tooth)-1))
-  prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))
-  E0 += pt2_detail(pt2_stoch_istate,first_det_of_teeth(tooth)) * prop
-  pt2(pt2_stoch_istate) = E0 + (sumabove(tooth) / Nabove(tooth))
+!<<<<<<< HEAD
 
+  if(tooth == comb_teeth+1) then
+    pt2(pt2_stoch_istate) = sum(pt2_detail(pt2_stoch_istate,:))
+    error(pt2_stoch_istate) = 0d0
+  else
+    E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
+    prop = ((1d0 - dfloat(comb_teeth - tooth + 1) * comb_step) - pt2_cweight(first_det_of_teeth(tooth)-1))
+    prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))
+    E0 += pt2_detail(pt2_stoch_istate,first_det_of_teeth(tooth)) * prop
+    pt2(pt2_stoch_istate) = E0 + (sumabove(tooth) / Nabove(tooth))
+    error(pt2_stoch_istate) = sqrt(1d0 / (Nabove(tooth)-1) * abs(sum2above(tooth) / Nabove(tooth) - (sumabove(tooth)/Nabove(tooth))**2))
+  end if
+  
+!=======
+! 
+!  E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
+!  prop = ((1d0 - dfloat(comb_teeth - tooth + 1) * comb_step) - pt2_cweight(first_det_of_teeth(tooth)-1))
+!  prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))
+!  E0 += pt2_detail(pt2_stoch_istate,first_det_of_teeth(tooth)) * prop
+!  pt2(pt2_stoch_istate) = E0 + (sumabove(tooth) / Nabove(tooth))
+!
+!>>>>>>> master
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call sort_selection_buffer(b)
 end subroutine
@@ -393,7 +410,7 @@ subroutine get_first_tooth(computed, first_teeth)
   integer, intent(out) :: first_teeth
   integer :: i, first_det
 
-  first_det = 1
+  first_det = N_det_generators+1+1
   first_teeth = 1
   do i=first_det_of_comb, N_det_generators
     if(.not.(computed(i))) then
@@ -402,7 +419,7 @@ subroutine get_first_tooth(computed, first_teeth)
     end if
   end do
   
-  do i=comb_teeth, 1, -1
+  do i=comb_teeth+1, 1, -1
     if(first_det_of_teeth(i) < first_det) then
       first_teeth = i
       exit

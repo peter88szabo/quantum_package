@@ -84,8 +84,7 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
     !hole    (k,1) = iand(psi_det_generators(k,1,i_generator), full_ijkl_bitmask(k))
     !hole    (k,2) = iand(psi_det_generators(k,2,i_generator), full_ijkl_bitmask(k))
     !particle(k,1) = iand(not(psi_det_generators(k,1,i_generator)), full_ijkl_bitmask(k))
-    !particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k))
- 
+    !particle(k,2) = iand(not(psi_det_generators(k,2,i_generator)), full_ijkl_bitmask(k)) 
   enddo
 
   integer                        :: N_holes(2), N_particles(2)
@@ -100,10 +99,10 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
   allocate (indices(N_det),  &
             exc_degree(max(N_det_alpha_unique,N_det_beta_unique)))
 
-  PROVIDE psi_bilinear_matrix_columns_loc psi_det_alpha_unique psi_det_beta_unique
-  PROVIDE psi_bilinear_matrix_rows psi_det_sorted_order psi_bilinear_matrix_order
-  PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
-  PROVIDE psi_bilinear_matrix_transp_order
+  !PROVIDE psi_bilinear_matrix_columns_loc psi_det_alpha_unique psi_det_beta_unique
+  !PROVIDE psi_bilinear_matrix_rows psi_det_sorted_order psi_bilinear_matrix_order
+  !PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
+  !PROVIDE psi_bilinear_matrix_transp_order
 
   k=1
   do i=1,N_det_alpha_unique
