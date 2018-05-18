@@ -1,4 +1,26 @@
 use bitmasks
+BEGIN_PROVIDER [ double precision, selection_weight, (N_states) ]
+ implicit none
+ BEGIN_DOC
+ ! Weight of the states in the selection : 1/(sum_i c_i^4)
+ END_DOC
+ integer :: i,k
+ double precision :: c
+ print *,  'Selection weights'
+ print *,  '-----------------'
+ do i=1,N_states
+   selection_weight(i) = 0.d0
+   do k=1,N_det
+    c = psi_coef(k,i)*psi_coef(k,i)
+    selection_weight(i) = selection_weight(i) + c*abs(psi_coef(k,i))
+   enddo
+   selection_weight(i) = 1.d0/selection_weight(i)
+   print *,  i, selection_weight(i)
+ enddo
+ print *,  '-----------------'
+
+END_PROVIDER
+
 
 BEGIN_PROVIDER [ integer, fragment_count ]
   implicit none
@@ -594,7 +616,7 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
   logical :: ok
   integer :: s1, s2, p1, p2, ib, j, istate
   integer(bit_kind) :: mask(N_int, 2), det(N_int, 2)
-  double precision :: e_pert, delta_E, val, Hii, min_e_pert,tmp
+  double precision :: e_pert, delta_E, val, Hii, sum_e_pert, tmp
   double precision, external :: diag_H_mat_elem_fock
   
   logical, external :: detEq
@@ -621,7 +643,7 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
       call apply_particles(mask, s1, p1, s2, p2, det, ok, N_int)
       
       Hii = diag_H_mat_elem_fock(psi_det_generators(1,1,i_generator),det,fock_diag_tmp,N_int)
-      min_e_pert = 0d0
+      sum_e_pert = 0d0
       
       do istate=1,N_states
         delta_E = E0(istate) - Hii
@@ -632,11 +654,11 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
         endif
         e_pert = 0.5d0 * (tmp - delta_E)
         pt2(istate) = pt2(istate) + e_pert
-        min_e_pert = min(e_pert,min_e_pert)
+        sum_e_pert = sum_e_pert + e_pert * selection_weight(istate)
       end do
       
-      if(min_e_pert <= buf%mini) then
-        call add_to_selection_buffer(buf, det, min_e_pert)
+      if(sum_e_pert <= buf%mini) then
+        call add_to_selection_buffer(buf, det, sum_e_pert)
       end if
     end do
   end do
