@@ -57,6 +57,8 @@ subroutine run_wf
       PROVIDE psi_bilinear_matrix_rows psi_det_sorted_order psi_bilinear_matrix_order
       PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
       PROVIDE psi_bilinear_matrix_transp_order
+      psi_energy(1:N_states) = energy(1:N_states)
+      TOUCH psi_energy
 
       !$OMP PARALLEL PRIVATE(i)
       i = omp_get_thread_num()

@@ -65,6 +65,8 @@ subroutine run_wf
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
+      psi_energy(1:N_states) = energy(1:N_states)
+      TOUCH psi_energy
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
@@ -105,6 +107,8 @@ subroutine run_wf
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle
+      psi_energy(1:N_states) = energy(1:N_states)
+      TOUCH psi_energy
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
