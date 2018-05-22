@@ -65,12 +65,14 @@ END_PROVIDER
 
 BEGIN_PROVIDER [ integer , N_det_delta_ij ]
   implicit none
-  !N_det_delta_ij = 0!N_det
+  N_det_delta_ij = 1
 END_PROVIDER
 
 BEGIN_PROVIDER [ double precision, delta_ij, (N_states, N_det, 2) ]
   implicit none
-  if(.true.) delta_ij(:,:N_det_delta_ij, :) = delta_ij_tmp(:,:,:)
+  if(.true.) then
+    delta_ij(:,:N_det_delta_ij, :) = delta_ij_tmp(:,:,:)
+  endif
   delta_ij(:,N_det_delta_ij+1:,:) = 0d0
 END_PROVIDER
 

@@ -101,8 +101,8 @@ subroutine map_load_from_disk(filename,map)
     k = map % consolidated_idx (i+2_8)
     l =  map % consolidated_idx (i+1_8) 
     n_elements = int(k - l, 4)
-    key_p => map % consolidated_key   (l:l+n_elements)
-    value_p => map % consolidated_value ( l:l+n_elements )
+    key_p => map % consolidated_key   (l:l+n_elements-1)
+    value_p => map % consolidated_value ( l:l+n_elements-1 )
     map % map(i) % key   => key_p
     map % map(i) % value => value_p
     map % map(i) % sorted = .True.

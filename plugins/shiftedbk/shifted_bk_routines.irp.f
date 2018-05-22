@@ -51,6 +51,7 @@ subroutine generator_done(i_gen, int_buf, double_buf, det_buf, N_buf, iproc)
   double precision, intent(out) :: double_buf(N_dress_double_buffer)
   integer(bit_kind), intent(out) :: det_buf(N_int, 2, N_dress_det_buffer)
   integer :: i
+  int_buf(:) = 0
   
     call sort_selection_buffer(sb(iproc))
     det_buf(:,:,:sb(iproc)%cur) = sb(iproc)%det(:,:,:sb(iproc)%cur)
@@ -115,15 +116,18 @@ subroutine delta_ij_done()
   old_det_gen = N_det_generators
  
 
-  call sort_selection_buffer(global_sb)
-  call fill_H_apply_buffer_no_selection(global_sb%cur,global_sb%det,N_int,0) 
-  call copy_H_apply_buffer_to_wf()
-
-  if (s2_eig.or.(N_states > 1) ) then
-    call make_s2_eigenfunction
+  if (dress_stoch_istate == N_states) then
+    ! Add buffer only when the last state is computed
+    call sort_selection_buffer(global_sb)
+    call fill_H_apply_buffer_no_selection(global_sb%cur,global_sb%det,N_int,0) 
+    call copy_H_apply_buffer_to_wf()
+    if (s2_eig.or.(N_states > 1) ) then
+      call make_s2_eigenfunction
+    endif
+    call undress_with_alpha(old_generators, old_det_gen, psi_det(1,1,N_det_delta_ij+1), N_det-N_det_delta_ij)
+    call save_wavefunction
   endif
-  call undress_with_alpha(old_generators, old_det_gen, psi_det(1,1,N_det_delta_ij+1), N_det-N_det_delta_ij)
-  call save_wavefunction
+
 end subroutine
 
 

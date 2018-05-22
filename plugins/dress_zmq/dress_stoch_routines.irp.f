@@ -133,16 +133,18 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error, lndet)
       print *,  irp_here, ': Failed in zmq_set_running'
     endif
     
-    !!$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc)              &
-    !    !$OMP  PRIVATE(i)
-    !i = omp_get_thread_num()
-    !if (i==0) then
+    call omp_set_nested(.true.)
+    !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(2)              &
+        !$OMP  PRIVATE(i)
+    i = omp_get_thread_num()
+    if (i==0) then
       call dress_collector(zmq_socket_pull,E, relative_error, delta, delta_s2, dress,&
          dress_stoch_istate)
-    !else
-    !  call dress_slave_inproc(i)
-    !endif
-    !!$OMP END PARALLEL
+    else
+      call dress_slave_inproc(i)
+    endif
+    !$OMP END PARALLEL
+    call omp_set_nested(.false.)
     delta_out(dress_stoch_istate,1:N_det) = delta(dress_stoch_istate,1:N_det)
     delta_s2_out(dress_stoch_istate,1:N_det) = delta_s2(dress_stoch_istate,1:N_det)
     call end_parallel_job(zmq_to_qp_run_socket, zmq_socket_pull, 'dress')
@@ -237,6 +239,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       call wall_time(time)
     end if
     
+    print *,  cur_cp, ind
     
     if(cur_cp == -1) then
       call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
@@ -348,7 +351,7 @@ end function
 !
 ! gen_per_cp : number of generators per checkpoint
   END_DOC
-  comb_teeth = 64
+  comb_teeth = min(1+N_det/10,64)
   N_cps_max = 16
   gen_per_cp = (N_det_generators / N_cps_max) + 1
 END_PROVIDER
@@ -505,6 +508,12 @@ END_PROVIDER
     done_cp_at_det(dress_jobs(i)) = cur_cp
     needed_by_cp(cur_cp) += 1
   end do
+
+
+print *,  'needed_by_cp'
+do i=1,cur_cp
+  print *,  i, needed_by_cp(i)
+enddo
   
 
   under_det = 0

@@ -59,10 +59,8 @@ integer, external              :: zmq_get_dvector, zmq_get_N_det_generators
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'dress_stoch_istate',tmp,1) == -1) cycle
       dress_stoch_istate = int(tmp)
-      
-      
-      TOUCH dress_stoch_istate
-      TOUCH state_average_weight
+      psi_energy(1:N_states) = energy(1:N_states)
+      TOUCH psi_energy dress_stoch_istate state_average_weight
 
       PROVIDE psi_bilinear_matrix_columns_loc psi_det_alpha_unique psi_det_beta_unique
       PROVIDE psi_bilinear_matrix_rows psi_det_sorted_order psi_bilinear_matrix_order

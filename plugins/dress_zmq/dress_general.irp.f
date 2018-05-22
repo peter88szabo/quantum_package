@@ -63,11 +63,11 @@ subroutine run_dressing(N_st,energy)
     enddo
     print *,  'Variational energy <Psi|H|Psi>'
     do i=1,N_st
-      print *,  i, psi_energy(i)
+      print *,  i, psi_energy(i)+nuclear_repulsion
     enddo
     print *,  'Dressed energy <Psi|H+Delta|Psi>'
     do i=1,N_st
-      print *,  i, ci_energy_dressed(i)
+      print *,  i, ci_energy_dressed(i)+nuclear_repulsion
     enddo
   endif
   

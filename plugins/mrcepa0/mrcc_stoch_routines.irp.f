@@ -310,7 +310,6 @@ subroutine mrcc_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, m
         end if
       end do
       if(cur_cp == 0) then
-        print *, "no checkpoint reached so far..."
         cycle pullLoop
       end if
       !!!!!!!!!!!!

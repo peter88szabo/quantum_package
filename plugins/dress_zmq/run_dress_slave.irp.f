@@ -48,7 +48,7 @@ subroutine run_dress_slave(thread,iproce,energy)
   double precision :: fac
    
 
-  if(iproce /= 0) stop "RUN DRESS SLAVE is OMP"
+!  if(iproce /= 0) stop "RUN DRESS SLAVE is OMP"
   
   allocate(delta_det(N_states, N_det, 0:comb_teeth+1, 2))
   allocate(cp(N_states, N_det, N_cp, 2))

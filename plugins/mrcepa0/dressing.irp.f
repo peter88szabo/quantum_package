@@ -581,7 +581,7 @@ END_PROVIDER
   
   double precision, allocatable  :: mrcc(:)
   double precision               :: E_CI_before!, relative_error
-  double precision, save :: target_error = 0d0
+  double precision, save :: target_error = 2d-2
 
   allocate(mrcc(N_states))
 
@@ -594,11 +594,10 @@ END_PROVIDER
   threshold_selectors = 1.d0
   threshold_generators = 1d0 
   if(target_error /= 0d0) then
-    target_error = target_error / 2d0 ! (-mrcc_E0_denominator(1) + mrcc_previous_E(1)) / 1d1
+    target_error = target_error * 0.5d0 ! (-mrcc_E0_denominator(1) + mrcc_previous_E(1)) / 1d1
   else
     target_error = 1d-4
   end if
-  target_error = 0d0
   call ZMQ_mrcc(E_CI_before, mrcc, delta_ij_mrcc_zmq, delta_ij_s2_mrcc_zmq, abs(target_error))
 
   mrcc_previous_E(:) = mrcc_E0_denominator(:)
