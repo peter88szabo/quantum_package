@@ -227,6 +227,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
   pullLoop : do while (loop)
     call pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, dress_mwen)
+    !print *, cur_cp, ind
     if(floop) then
       call wall_time(time)
       print *, "first_pull", time-time0
@@ -375,7 +376,7 @@ END_PROVIDER
   integer, allocatable :: filler(:)
   integer :: nfiller, lfiller, cfiller
   logical :: fracted
-    
+   
   integer :: first_suspect
   provide psi_coef_generators
   first_suspect = 1
@@ -436,7 +437,7 @@ END_PROVIDER
     end if
 
     !!!!!!!!!!!!!!!!!!!!!!!!
-    if(.FALSE.) then 
+    if(.TRUE.) then 
     do l=first_suspect,N_det_generators
       if((.not. computed(l))) then
         N_dress_jobs+=1
@@ -620,7 +621,6 @@ subroutine add_comb(com, computed, cp, N, tbc)
   
   !DIR$ FORCEINLINE
   call get_comb(com, dets)
-  
   k=N+1
   do i = 1, comb_teeth
     l = dets(i)
@@ -681,10 +681,11 @@ END_PROVIDER
   norm_left = 1d0
   
   comb_step = 1d0/dfloat(comb_teeth)
+  !print *, "comb_step", comb_step
   first_det_of_comb = 1
-  do i=1,min(100,N_det_generators)
+  do i=1,N_det_generators ! min(100,N_det_generators)
+    first_det_of_comb = i
     if(dress_weight(i)/norm_left < comb_step) then
-      first_det_of_comb = i
       exit
     end if
     norm_left -= dress_weight(i)

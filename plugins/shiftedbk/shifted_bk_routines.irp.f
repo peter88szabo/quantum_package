@@ -52,22 +52,26 @@ subroutine generator_done(i_gen, int_buf, double_buf, det_buf, N_buf, iproc)
   integer :: i
   
     call sort_selection_buffer(sb(iproc))
-    det_buf(:,:,:sb(iproc)%cur) = sb(iproc)%det(:,:,:sb(iproc)%cur)
-    double_buf(:sb(iproc)%cur) = sb(iproc)%val(:sb(iproc)%cur)
-    double_buf(sb(iproc)%cur+1:sb(iproc)%cur+N_states) = slave_sum_alpha2(:,iproc)
-    N_buf(1) = 1
-    N_buf(2) = sb(iproc)%cur+N_states
-    N_buf(3) = sb(iproc)%cur
-    
+   
     if(sb(iproc)%cur > 0) then
       !$OMP CRITICAL
       call merge_selection_buffers(sb(iproc), mini_sb)
       !call sort_selection_buffer(mini_sb)
       do i=1,Nproc
-        sb(i)%mini = min(sb(i)%mini, mini_sb%mini)
+        mini_sb%mini = min(sb(i)%mini, mini_sb%mini)
+      end do
+      do i=1,Nproc
+        sb(i)%mini = mini_sb%mini
       end do
       !$OMP END CRITICAL
     end if
+      call truncate_to_mini(sb(iproc))
+      det_buf(:,:,:sb(iproc)%cur) = sb(iproc)%det(:,:,:sb(iproc)%cur)
+      double_buf(:sb(iproc)%cur) = sb(iproc)%val(:sb(iproc)%cur)
+      double_buf(sb(iproc)%cur+1:sb(iproc)%cur+N_states) = slave_sum_alpha2(:,iproc)
+      N_buf(1) = 1
+      N_buf(2) = sb(iproc)%cur+N_states
+      N_buf(3) = sb(iproc)%cur
     
     sb(iproc)%cur = 0
     slave_sum_alpha2(:,iproc) = 0d0

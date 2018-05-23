@@ -323,7 +323,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
         eqt = 0.d0
       endif
       call wall_time(time)
-      if ( (dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error) .and. Nabove(tooth) >= 30) then
+      if ( ((dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error)) .and. Nabove(tooth) >= 30) then
         ! Termination
         pt2(pt2_stoch_istate) = avg
         error(pt2_stoch_istate) = eqt
