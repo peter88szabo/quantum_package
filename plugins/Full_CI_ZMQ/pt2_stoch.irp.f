@@ -19,14 +19,14 @@ subroutine run
   double precision               :: E_CI_before, relative_error, absolute_error, eqt
 
   allocate (pt2(N_states))
-  call diagonalize_CI()
-  pt2 = 0.d0
+!  call diagonalize_CI()
+  pt2(:) = 0.d0
   
-  E_CI_before = pt2_E0_denominator(1) + nuclear_repulsion
+  E_CI_before = psi_energy(1) + nuclear_repulsion
   threshold_selectors = 1.d0
-  threshold_generators = 1d0 
-  relative_error = 1.d-9
-  absolute_error = 1.d-9
+  threshold_generators = 1.d0 
+  relative_error = 1.d-3
+  absolute_error = 1.d-5
   call ZMQ_pt2(E_CI_before, pt2, relative_error, absolute_error, eqt)
   print *,  'Final step'
   print *,  'N_det    = ', N_det
