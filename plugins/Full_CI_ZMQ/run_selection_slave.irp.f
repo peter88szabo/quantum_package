@@ -50,8 +50,8 @@ subroutine run_selection_slave(thread,iproc,energy)
     if (done) then
       ctask = ctask - 1
     else
-      integer :: i_generator, N
-      read(task,*) i_generator, N
+      integer :: i_generator, N, subset
+      read(task,*) subset, i_generator, N
       if(buf%N == 0) then
         ! Only first time 
         call create_selection_buffer(N, N*2, buf)
@@ -60,7 +60,7 @@ subroutine run_selection_slave(thread,iproc,energy)
       else
         ASSERT (N == buf%N)
       end if
-      call select_connected(i_generator,energy,pt2,buf,0)
+      call select_connected(i_generator,energy,pt2,buf,subset)
     endif
 
     integer, external :: task_done_to_taskserver
