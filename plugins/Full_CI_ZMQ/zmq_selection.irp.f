@@ -10,7 +10,6 @@ subroutine ZMQ_selection(N_in, pt2)
   integer                        :: i, N
   integer, external              :: omp_get_thread_num
   double precision, intent(out)  :: pt2(N_states)
-  integer, parameter             :: maxtasks=10000
   
   
   PROVIDE fragment_count
@@ -21,7 +20,7 @@ subroutine ZMQ_selection(N_in, pt2)
     PROVIDE psi_bilinear_matrix_columns_loc psi_det_alpha_unique psi_det_beta_unique
     PROVIDE psi_bilinear_matrix_rows psi_det_sorted_order psi_bilinear_matrix_order
     PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
-    PROVIDE psi_bilinear_matrix_transp_order
+    PROVIDE psi_bilinear_matrix_transp_order fragment_count
 
     call new_parallel_job(zmq_to_qp_run_socket,zmq_socket_pull,'selection')
 
@@ -46,26 +45,40 @@ subroutine ZMQ_selection(N_in, pt2)
   endif
 
   integer, external :: add_task_to_taskserver
-  character*(20*maxtasks) :: task
+  character(len=64000)           :: task
+  integer :: j,k,ipos
+  ipos=1
   task = ' ' 
 
-  integer :: k
-  k=0
   do i= 1, N_det_generators
-    k = k+1
-    write(task(20*(k-1)+1:20*k),'(I9,1X,I9,''|'')') i, N
-    if (k>=maxtasks) then
-       k=0
-       if (add_task_to_taskserver(zmq_to_qp_run_socket,task) == -1) then
-         stop 'Unable to add task to task server'
-       endif
+    if (i>ishft(N_det_generators,-7)) then
+      write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') 0, i, N
+      ipos += 30
+      if (ipos > 63970) then
+        if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
+          stop 'Unable to add task to task server'
+        endif
+        ipos=1
+      endif
+    else
+      do j=1,fragment_count
+        write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') j, i, N
+        ipos += 30
+        if (ipos > 63970) then
+          if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
+            stop 'Unable to add task to task server'
+          endif
+          ipos=1
+        endif
+      end do
     endif
-  end do
-  if (k > 0) then
-    if (add_task_to_taskserver(zmq_to_qp_run_socket,task) == -1) then
+  enddo
+  if (ipos > 1) then
+    if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
       stop 'Unable to add task to task server'
     endif
   endif
+  
 
   ASSERT (associated(b%det))
   ASSERT (associated(b%val))
@@ -130,6 +143,9 @@ subroutine selection_collector(zmq_socket_pull, b, N, pt2)
   integer(bit_kind), pointer :: det(:,:,:)
   integer, allocatable :: task_id(:)
   type(selection_buffer) :: b2
+  
+  
+  
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
   call create_selection_buffer(N, N*2, b2)
