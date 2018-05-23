@@ -137,3 +137,22 @@ subroutine sort_selection_buffer(b)
   b%cur = nmwen
 end subroutine
 
+
+
+subroutine truncate_to_mini(b)
+  use selection_types
+  implicit none
+
+  type(selection_buffer), intent(inout) :: b
+  
+  do
+    if(b%cur == 0) exit
+    if(b%val(b%cur) <= b%mini) exit
+    b%cur -= 1
+  end do
+end subroutine
+
+
+
+
+
