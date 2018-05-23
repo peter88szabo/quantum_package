@@ -20,7 +20,7 @@ END_PROVIDER
    fock_diag_tmp_(:,:,:) = 0.d0
    integer                        :: i
    
-   N_det_increase_factor = 1d0
+   N_det_increase_factor = dble(N_states)
    
    
    n_det_add = max(1, int(float(N_det) * N_det_increase_factor))
@@ -120,17 +120,16 @@ subroutine delta_ij_done()
   old_det_gen = N_det_generators
  
 
-  if (dress_stoch_istate == N_states) then
-    ! Add buffer only when the last state is computed
-    call sort_selection_buffer(global_sb)
-    call fill_H_apply_buffer_no_selection(global_sb%cur,global_sb%det,N_int,0) 
-    call copy_H_apply_buffer_to_wf()
-    if (s2_eig.or.(N_states > 1) ) then
-      call make_s2_eigenfunction
-    endif
-    call undress_with_alpha(old_generators, old_det_gen, psi_det(1,1,N_det_delta_ij+1), N_det-N_det_delta_ij)
-    call save_wavefunction
+  ! Add buffer only when the last state is computed
+  call unique_selection_buffer(global_sb)
+  call sort_selection_buffer(global_sb)
+  call fill_H_apply_buffer_no_selection(global_sb%cur,global_sb%det,N_int,0) 
+  call copy_H_apply_buffer_to_wf()
+  if (s2_eig.or.(N_states > 1) ) then
+    call make_s2_eigenfunction
   endif
+  call undress_with_alpha(old_generators, old_det_gen, psi_det(1,1,N_det_delta_ij+1), N_det-N_det_delta_ij)
+  call save_wavefunction
 
 end subroutine
 

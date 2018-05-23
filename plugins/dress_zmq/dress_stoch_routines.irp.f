@@ -229,18 +229,14 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
   pullLoop : do while (loop)
     call pull_dress_results(zmq_socket_pull, ind, cur_cp, delta_loc, int_buf, double_buf, det_buf, N_buf, task_id, dress_mwen)
-    !print *, cur_cp, ind
     if(floop) then
       call wall_time(time)
-      print *, "first_pull", time-time0
       time0 = time
       floop = .false.
     end if
     if(cur_cp == -1 .and. ind == N_det_generators) then
       call wall_time(time)
     end if
-    
-    print *,  cur_cp, ind
     
     if(cur_cp == -1) then
       call dress_pulled(ind, int_buf, double_buf, det_buf, N_buf) 
@@ -295,7 +291,7 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
 
       !print '(I2X, F16.7, 2X, G16.3, 2X, F16.4, A20)', avg+E(istate)+E0, eqt, time-time0, ''
        print '(G10.3, 2X, F16.10, 2X, G16.3, 2X, F16.4, A20)', cps_N(cur_cp), avg+E0+E(istate), eqt, time-time0, ''
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30)) then
+      if ((dabs(eqt/(avg+E0+E(istate))) < relative_error .and. cps_N(cur_cp) >= 10)) then
         ! Termination
         print *, "TERMINATE"
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
@@ -510,12 +506,6 @@ END_PROVIDER
     needed_by_cp(cur_cp) += 1
   end do
 
-
-print *,  'needed_by_cp'
-do i=1,cur_cp
-  print *,  i, needed_by_cp(i)
-enddo
-  
 
   under_det = 0
   cp_first_tooth = 0

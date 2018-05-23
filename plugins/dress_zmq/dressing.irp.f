@@ -96,12 +96,13 @@ BEGIN_PROVIDER [ double precision, delta_ij_tmp, (N_states,N_det_delta_ij,2) ]
     E_CI_before(:) = psi_energy(:) + nuclear_repulsion
     threshold_selectors = 1.d0
     threshold_generators = 1.d0 
+    SOFT_TOUCH threshold_selectors threshold_generators
   !  if(errr /= 0d0) then
   !    errr = errr / 2d0 
   !  else
   !    errr = 1d-4
   !  end if
-    relative_error = 5.d-5
+    relative_error = 1.d-2
 
     call write_double(6,relative_error,"Convergence of the stochastic algorithm")
     
