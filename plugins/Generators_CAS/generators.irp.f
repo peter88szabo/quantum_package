@@ -39,7 +39,7 @@ END_PROVIDER
         psi_det_generators(k,1,m) = psi_det_sorted(k,1,i)
         psi_det_generators(k,2,m) = psi_det_sorted(k,2,i)
       enddo
-      psi_coef_generators(m,:) = psi_coef_sorted(m,:)
+      psi_coef_generators(m,:) = psi_coef_sorted(i,:)
     endif
   enddo
   
