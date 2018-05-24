@@ -2,7 +2,7 @@ open Core
 open Qputils
 open Qptypes
 
-let run ?(sym="None") ezfio_filename =
+let run ?(sym="None") apply ezfio_filename =
   Ezfio.set_file ezfio_filename ;
 
   let aos = 
@@ -72,26 +72,49 @@ let run ?(sym="None") ezfio_filename =
     | _         -> ([],[])
   in
 
-  match sym with
-  | "x" | "X"  | "y" | "Y"  | "z" | "Z" -> 
-      begin
-        Printf.printf "Pi: [";
-        List.iter ~f:(fun mo_i -> Printf.printf "%d," mo_i) pi;
-        Printf.printf "\b]\n\nSigma: [";
-        List.iter ~f:(fun mo_i -> Printf.printf "%d," mo_i) sigma;
-        Printf.printf "\b]\n"
-      end
-  | _ -> List.iter ~f:(fun (mo_i,x,y,z) -> Printf.printf "%d: (%f,%f,%f)\n" mo_i x y z) result
-  
+  begin
+    match sym with
+    | "x" | "X"  | "y" | "Y"  | "z" | "Z" -> 
+        if apply then
+          begin
+            let ne = Ezfio.get_electrons_elec_alpha_num () in
+            let command = 
+              (Printf.sprintf "qp_set_mo_class -act \"[") ^
+              (String.concat ~sep:"," @@ List.map ~f:string_of_int pi) ^
+              "]\" -core \"[" ^
+              (String.concat ~sep:"," @@ List.map ~f:string_of_int @@ List.filter ~f:(fun mo_i -> mo_i <= ne) sigma) ^
+              "]\" -del \"[" ^
+              (String.concat ~sep:"," @@ List.map ~f:string_of_int @@ List.filter ~f:(fun mo_i -> mo_i > ne) sigma) ^
+              "]\" " ^ ezfio_filename
+            in
+            print_endline command;
+            if Sys.command command <> 0 then
+              failwith "Command failed"
+          end
+        else
+          begin
+            Printf.printf "Pi: [";
+            List.iter ~f:(fun mo_i -> Printf.printf "%d," mo_i) pi;
+            Printf.printf "\b]\n\nSigma: [";
+            List.iter ~f:(fun mo_i -> Printf.printf "%d," mo_i) sigma;
+            Printf.printf "\b]\n"
+          end
+    | _ -> List.iter ~f:(fun (mo_i,x,y,z) -> Printf.printf "%d: (%f,%f,%f)\n" mo_i x y z) result
+  end
 
+  
 
 
 
 let spec =
   let open Command.Spec in
   empty
-  +> flag "sym" (optional string) ~doc:"{x,y,z} Axis perpendicular to the plane"
+  +> flag "sym" (optional string)
+    ~doc:"{x,y,z} Axis perpendicular to the plane"
+  +> flag "apply" no_arg
+    ~doc:"Set the pi space as the active space, all other MOs frozen"
   +> anon ("ezfio_filename" %: string)
+
 
 
 let command =
@@ -101,7 +124,7 @@ let command =
      "Find all the pi molecular orbitals to create a pi space.
      ")
     spec
-    (fun sym ezfio_filename () -> run ?sym ezfio_filename )
+    (fun sym apply ezfio_filename () -> run ?sym apply ezfio_filename)
 
 
 let () =
