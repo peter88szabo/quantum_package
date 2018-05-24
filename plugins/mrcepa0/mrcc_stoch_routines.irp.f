@@ -177,7 +177,6 @@ subroutine mrcc_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, m
   usf = 0d0
   num = 0d0
 
-  print *, "TARGET ERROR :", relative_error
   delta = 0d0
   delta_s2 = 0d0
   allocate(delta_det(N_states, N_det_non_ref, 0:comb_teeth+1, 2))
@@ -310,7 +309,6 @@ subroutine mrcc_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, m
         end if
       end do
       if(cur_cp == 0) then
-        print *, "no checkpoint reached so far..."
         cycle pullLoop
       end if
       !!!!!!!!!!!!
@@ -337,7 +335,7 @@ subroutine mrcc_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, m
         print '(I5,F15.7,E12.4,F10.2)', cur_cp, E(mrcc_stoch_istate)+E0+avg, eqt, time-timeInit
       end if
       
-      if ((dabs(eqt) < relative_error .and. cps_N(cur_cp) >= 30)  .or. total_computed == N_det_generators) then
+      if (((dabs(eqt)/(E(mrcc_stoch_istate)+E0+avg) < relative_error) .and. cps_N(cur_cp) >= 10)  .or. total_computed == N_det_generators) then
         if (zmq_abort(zmq_to_qp_run_socket) == -1) then
           call sleep(1)
           if (zmq_abort(zmq_to_qp_run_socket) == -1) then

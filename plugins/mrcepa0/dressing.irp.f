@@ -581,7 +581,7 @@ END_PROVIDER
   
   double precision, allocatable  :: mrcc(:)
   double precision               :: E_CI_before!, relative_error
-  double precision, save :: target_error = 0d0
+  double precision, save :: target_error = 1d-4
 
   allocate(mrcc(N_states))
 
