@@ -1,26 +1,4 @@
 use bitmasks
-BEGIN_PROVIDER [ double precision, selection_weight, (N_states) ]
- implicit none
- BEGIN_DOC
- ! Weight of the states in the selection : 1/(sum_i c_i^4)
- END_DOC
- integer :: i,k
- double precision :: c
- print *,  'Selection weights'
- print *,  '-----------------'
- do i=1,N_states
-   selection_weight(i) = 0.d0
-   do k=1,N_det
-    c = psi_coef(k,i)*psi_coef(k,i)
-    selection_weight(i) = selection_weight(i) + c*abs(psi_coef(k,i))
-   enddo
-   selection_weight(i) = 1.d0/selection_weight(i)
-   print *,  i, selection_weight(i)
- enddo
- print *,  '-----------------'
-
-END_PROVIDER
-
 
 BEGIN_PROVIDER [ integer, fragment_count ]
   implicit none
@@ -654,7 +632,7 @@ subroutine fill_buffer_double(i_generator, sp, h1, h2, bannedOrb, banned, fock_d
         endif
         e_pert = 0.5d0 * (tmp - delta_E)
         pt2(istate) = pt2(istate) + e_pert
-        sum_e_pert = sum_e_pert + e_pert * selection_weight(istate)
+        sum_e_pert = sum_e_pert + e_pert * state_average_weight(istate)
       end do
       
       if(sum_e_pert <= buf%mini) then

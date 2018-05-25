@@ -367,13 +367,13 @@ end
    j = psi_bilinear_matrix_columns(k)
    f = 0.d0
    do l=1,N_states
-    f += psi_bilinear_matrix_values(k,l)*psi_bilinear_matrix_values(k,l)
+    f += psi_bilinear_matrix_values(k,l)*psi_bilinear_matrix_values(k,l) * state_average_weight(l)
    enddo
    det_alpha_norm(i) += f
    det_beta_norm(j)  += f
  enddo
- det_alpha_norm = det_alpha_norm / dble(N_states)
- det_beta_norm = det_beta_norm / dble(N_states)
+ det_alpha_norm = det_alpha_norm 
+ det_beta_norm = det_beta_norm 
 
 END_PROVIDER
 

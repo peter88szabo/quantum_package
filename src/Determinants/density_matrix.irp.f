@@ -361,6 +361,28 @@ subroutine save_natural_mos
 end
 
 
+BEGIN_PROVIDER [ double precision, l3_weight, (N_states) ]
+ implicit none
+ BEGIN_DOC
+ ! Weight of the states in the selection : 1/(sum_i c_i^4)
+ END_DOC
+ integer :: i,k
+ double precision :: c
+ do i=1,N_states
+   l3_weight(i) = 1.d-31
+   do k=1,N_det
+    c = psi_coef(k,i)*psi_coef(k,i)
+    l3_weight(i) = l3_weight(i) + c*abs(psi_coef(k,i))
+   enddo
+   l3_weight(i) = min(1.d0/l3_weight(i), 100.d0)
+ enddo
+ print *,  'L3 weights'
+ print *,  '----------'
+ print *,  l3_weight(1:N_states)
+
+END_PROVIDER
+
+
 BEGIN_PROVIDER [ double precision, state_average_weight, (N_states) ]
  implicit none
  BEGIN_DOC
@@ -368,13 +390,17 @@ BEGIN_PROVIDER [ double precision, state_average_weight, (N_states) ]
  END_DOC
  logical :: exists
 
- state_average_weight(:) = 1.d0
- call ezfio_has_determinants_state_average_weight(exists)
- if (exists) then
-  call ezfio_get_determinants_state_average_weight(state_average_weight)
+ if (use_l3_weight) then
+  state_average_weight(:) = l3_weight(:)
+ else
+  state_average_weight(:) = 1.d0
+  call ezfio_has_determinants_state_average_weight(exists)
+  if (exists) then
+    call ezfio_get_determinants_state_average_weight(state_average_weight)
+  endif
+  state_average_weight(:) = state_average_weight(:)+1.d-31
+  state_average_weight(:) = state_average_weight(:)/(sum(state_average_weight(:)))
  endif
- state_average_weight(:) = state_average_weight(:)+1.d-31
- state_average_weight(:) = state_average_weight(:)/(sum(state_average_weight(:)))
 END_PROVIDER
 
 
