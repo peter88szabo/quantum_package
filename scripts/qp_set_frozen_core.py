@@ -6,8 +6,16 @@ import sys
 sys.path = [ os.environ["QP_ROOT"]+"/install/EZFIO/Python" ] + sys.path
 from ezfio import ezfio
 
-ezfio.set_filename(sys.argv[1])
-if ezfio.get_pseudo_do_pseudo:
+
+filename = sys.argv[1]
+if filename == '-q': filename = sys.argv[2]
+
+ezfio.set_filename(filename)
+
+if ezfio.pseudo_do_pseudo:
+  if '-q' in sys.argv:
+    print 0
+    sys.exit(0)
   print "I will not set frozen core with pseudopotentials."
   sys.exit(0)
 
@@ -23,7 +31,7 @@ for charge in ezfio.nuclei_nucl_charge:
 mo_tot_num = ezfio.mo_basis_mo_tot_num
 
 if len(sys.argv)>2:
-  if sys.argv[2] == '-q':
+  if '-q' in sys.argv:
     print nb
     sys.exit(0)
 

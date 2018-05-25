@@ -2,7 +2,7 @@ open Core
 open Qputils
 open Qptypes
 
-let run ?(sym="None") apply ezfio_filename =
+let run ?(sym="None") ?(apply="no") fc ezfio_filename =
   Ezfio.set_file ezfio_filename ;
 
   let aos = 
@@ -75,17 +75,43 @@ let run ?(sym="None") apply ezfio_filename =
   begin
     match sym with
     | "x" | "X"  | "y" | "Y"  | "z" | "Z" -> 
-        if apply then
+        if apply = "cas" then
           begin
             let ne = Ezfio.get_electrons_elec_alpha_num () in
             let command = 
-              (Printf.sprintf "qp_set_mo_class -act \"[") ^
+              "qp_set_mo_class -act \"[" ^
               (String.concat ~sep:"," @@ List.map ~f:string_of_int pi) ^
               "]\" -core \"[" ^
               (String.concat ~sep:"," @@ List.map ~f:string_of_int @@ List.filter ~f:(fun mo_i -> mo_i <= ne) sigma) ^
               "]\" -del \"[" ^
               (String.concat ~sep:"," @@ List.map ~f:string_of_int @@ List.filter ~f:(fun mo_i -> mo_i > ne) sigma) ^
               "]\" " ^ ezfio_filename
+            in
+            print_endline command;
+            if Sys.command command <> 0 then
+              failwith "Command failed"
+          end
+        else if apply = "cassd" then
+          begin
+            let ne = Ezfio.get_electrons_elec_alpha_num () in
+            let nfc = 
+              if fc then
+                let ic =
+                  Unix.open_process_in ("qp_set_frozen_core.py -q "^ezfio_filename)
+                in
+                let result = int_of_string @@ input_line ic in
+                close_in ic; result
+              else 0
+            in
+            let command = 
+              "qp_set_mo_class" ^
+              ( if nfc > 0 then
+                Printf.sprintf " -core \"[1-%d]\"" nfc else "") ^
+              " -inact \"[" ^
+              (String.concat ~sep:"," @@ List.map ~f:string_of_int @@ List.filter ~f:(fun mo_i -> mo_i > nfc && mo_i <= ne) sigma) ^ "]\"" ^
+              " -act \"[" ^ (String.concat ~sep:"," @@ List.map ~f:string_of_int pi) ^ "]\"" ^
+              " -virt \"[" ^
+              (String.concat ~sep:"," @@ List.map ~f:string_of_int @@ List.filter ~f:(fun mo_i -> mo_i > ne) sigma) ^ "]\" " ^ ezfio_filename
             in
             print_endline command;
             if Sys.command command <> 0 then
@@ -111,8 +137,10 @@ let spec =
   empty
   +> flag "sym" (optional string)
     ~doc:"{x,y,z} Axis perpendicular to the plane"
-  +> flag "apply" no_arg
-    ~doc:"Set the pi space as the active space, all other MOs frozen"
+  +> flag "apply" (optional string)
+    ~doc:"[cas|cassd] Set the pi space as the active space, all other MOs frozen. If [cassd] is chosen, set inactive and virtual mos."
+  +> flag "fc" no_arg
+    ~doc:"freeze core MOs with -apply cassd"
   +> anon ("ezfio_filename" %: string)
 
 
@@ -124,7 +152,7 @@ let command =
      "Find all the pi molecular orbitals to create a pi space.
      ")
     spec
-    (fun sym apply ezfio_filename () -> run ?sym apply ezfio_filename)
+    (fun sym apply fc ezfio_filename () -> run ?sym ?apply fc ezfio_filename)
 
 
 let () =
