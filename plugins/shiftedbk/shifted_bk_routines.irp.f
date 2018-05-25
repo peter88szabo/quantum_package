@@ -221,7 +221,7 @@ subroutine dress_with_alpha_(Nstates,Ndet,Nint,delta_ij_loc,minilist, det_minili
   BEGIN_DOC
   !delta_ij_loc(:,:,1) : dressing column for H
   !delta_ij_loc(:,:,2) : dressing column for S2
-  !minilist : indices of determinants connected to alpha ( in psi_det_sorted )
+  !minilist : indices of determinants connected to alpha ( in psi_det )
   !n_minilist : size of minilist
   !alpha : alpha determinant
   END_DOC
@@ -280,7 +280,7 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
   !delta_ij_loc(:,:,1) : dressing column for H
   !delta_ij_loc(:,:,2) : dressing column for S2
   !i_gen : generator index in psi_det_generators
-  !minilist : indices of determinants connected to alpha ( in psi_det_sorted )
+  !minilist : indices of determinants connected to alpha ( in psi_det )
   !n_minilist : size of minilist
   !alpha : alpha determinant
   END_DOC

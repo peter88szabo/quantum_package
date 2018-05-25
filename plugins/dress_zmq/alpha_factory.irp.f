@@ -20,15 +20,15 @@ subroutine alpha_callback(delta_ij_loc, i_generator, subset,iproc)
 end subroutine
 
 
-BEGIN_PROVIDER [ integer, psi_from_sorted, (N_det) ]
+BEGIN_PROVIDER [ integer, psi_from_sorted_gen, (N_det) ]
   implicit none
   integer :: i,inpsisor
   
-  psi_from_sorted = 0
+  psi_from_sorted_gen = 0
 
   do i=1,N_det
-    psi_from_sorted(psi_det_sorted_order(i)) = i
-    inpsisor = psi_det_sorted_order(i)
+    psi_from_sorted_gen(psi_det_sorted_gen_order(i)) = i
+    inpsisor = psi_det_sorted_gen_order(i)
     if(inpsisor <= 0) stop "idx_non_ref_from_sorted"
   end do
 END_PROVIDER
@@ -100,7 +100,7 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
             exc_degree(max(N_det_alpha_unique,N_det_beta_unique)))
 
   !PROVIDE psi_bilinear_matrix_columns_loc psi_det_alpha_unique psi_det_beta_unique
-  !PROVIDE psi_bilinear_matrix_rows psi_det_sorted_order psi_bilinear_matrix_order
+  !PROVIDE psi_bilinear_matrix_rows psi_det_sorted_gen_order psi_bilinear_matrix_order
   !PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
   !PROVIDE psi_bilinear_matrix_transp_order
 
@@ -117,7 +117,7 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
     do l_a=psi_bilinear_matrix_columns_loc(j), psi_bilinear_matrix_columns_loc(j+1)-1
       i = psi_bilinear_matrix_rows(l_a)
       if (nt + exc_degree(i) <= 4) then
-        indices(k) = psi_det_sorted_order(psi_bilinear_matrix_order(l_a))
+        indices(k) = psi_det_sorted_gen_order(psi_bilinear_matrix_order(l_a))
         k=k+1
       endif
     enddo
@@ -136,7 +136,7 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
       i = psi_bilinear_matrix_transp_columns(l_a)
       if (exc_degree(i) < 3) cycle
       if (nt + exc_degree(i) <= 4) then
-        indices(k) = psi_det_sorted_order(                   &
+        indices(k) = psi_det_sorted_gen_order(                   &
                         psi_bilinear_matrix_order(           &
                           psi_bilinear_matrix_transp_order(l_a)))
         k=k+1
@@ -160,15 +160,15 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
     negMask(i,1) = not(psi_det_generators(i,1,i_generator))
     negMask(i,2) = not(psi_det_generators(i,2,i_generator))
   end do
-  if(psi_det_generators(1,1,i_generator) /= psi_det_sorted(1,1,i_generator)) stop "gen <> sorted"
+  if(psi_det_generators(1,1,i_generator) /= psi_det_sorted_gen(1,1,i_generator)) stop "gen <> sorted"
   do k=1,nmax
     i = indices(k)
-    mobMask(1,1) = iand(negMask(1,1), psi_det_sorted(1,1,i))
-    mobMask(1,2) = iand(negMask(1,2), psi_det_sorted(1,2,i))
+    mobMask(1,1) = iand(negMask(1,1), psi_det_sorted_gen(1,1,i))
+    mobMask(1,2) = iand(negMask(1,2), psi_det_sorted_gen(1,2,i))
     nt = popcnt(mobMask(1, 1)) + popcnt(mobMask(1, 2)) 
     do j=2,N_int
-      mobMask(j,1) = iand(negMask(j,1), psi_det_sorted(j,1,i))
-      mobMask(j,2) = iand(negMask(j,2), psi_det_sorted(j,2,i))
+      mobMask(j,1) = iand(negMask(j,1), psi_det_sorted_gen(j,1,i))
+      mobMask(j,2) = iand(negMask(j,2), psi_det_sorted_gen(j,2,i))
       nt = nt + popcnt(mobMask(j, 1)) + popcnt(mobMask(j, 2)) 
     end do
 
@@ -177,8 +177,8 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
         preinteresting(0) += 1
         preinteresting(preinteresting(0)) = i
         do j=1,N_int
-          preinteresting_det(j,1,preinteresting(0)) = psi_det_sorted(j,1,i)
-          preinteresting_det(j,2,preinteresting(0)) = psi_det_sorted(j,2,i)
+          preinteresting_det(j,1,preinteresting(0)) = psi_det_sorted_gen(j,1,i)
+          preinteresting_det(j,2,preinteresting(0)) = psi_det_sorted_gen(j,2,i)
         enddo
       else if(nt <= 2) then
         prefullinteresting(0) += 1
@@ -287,13 +287,13 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
       do ii=1,prefullinteresting(0)
         i = prefullinteresting(ii)
         nt = 0
-        mobMask(1,1) = iand(negMask(1,1), psi_det_sorted(1,1,i))
-        mobMask(1,2) = iand(negMask(1,2), psi_det_sorted(1,2,i))
+        mobMask(1,1) = iand(negMask(1,1), psi_det_sorted_gen(1,1,i))
+        mobMask(1,2) = iand(negMask(1,2), psi_det_sorted_gen(1,2,i))
         nt = popcnt(mobMask(1, 1)) + popcnt(mobMask(1, 2))
         if (nt > 2) cycle
         do j=N_int,2,-1
-          mobMask(j,1) = iand(negMask(j,1), psi_det_sorted(j,1,i))
-          mobMask(j,2) = iand(negMask(j,2), psi_det_sorted(j,2,i))
+          mobMask(j,1) = iand(negMask(j,1), psi_det_sorted_gen(j,1,i))
+          mobMask(j,2) = iand(negMask(j,2), psi_det_sorted_gen(j,2,i))
           nt = nt+ popcnt(mobMask(j, 1)) + popcnt(mobMask(j, 2))
           if (nt > 2) exit
         end do
@@ -301,11 +301,11 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
         if(nt <= 2) then
           fullinteresting(0) += 1
           fullinteresting(fullinteresting(0)) = i
-          fullminilist(1,1,fullinteresting(0)) = psi_det_sorted(1,1,i)
-          fullminilist(1,2,fullinteresting(0)) = psi_det_sorted(1,2,i)
+          fullminilist(1,1,fullinteresting(0)) = psi_det_sorted_gen(1,1,i)
+          fullminilist(1,2,fullinteresting(0)) = psi_det_sorted_gen(1,2,i)
           do j=2,N_int
-            fullminilist(j,1,fullinteresting(0)) = psi_det_sorted(j,1,i)
-            fullminilist(j,2,fullinteresting(0)) = psi_det_sorted(j,2,i)
+            fullminilist(j,1,fullinteresting(0)) = psi_det_sorted_gen(j,1,i)
+            fullminilist(j,2,fullinteresting(0)) = psi_det_sorted_gen(j,2,i)
           enddo
         end if
       end do
@@ -390,7 +390,7 @@ subroutine alpha_callback_mask(delta_ij_loc, i_gen, sp, mask, bannedOrb, banned,
   allocate(abuf(siz), labuf(N_det), putten(N_det), det_minilist(N_int, 2, N_det))
   
   do i=1,siz
-    abuf(i) = psi_from_sorted(rabuf(i))
+    abuf(i) = psi_from_sorted_gen(rabuf(i))
   end do
 
   putten = .false.
