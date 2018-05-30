@@ -12,21 +12,15 @@ if filename == '-q': filename = sys.argv[2]
 
 ezfio.set_filename(filename)
 
-if ezfio.pseudo_do_pseudo:
-  if '-q' in sys.argv:
-    print 0
-    sys.exit(0)
-  print "I will not set frozen core with pseudopotentials."
-  sys.exit(0)
-
 nb = 0
-for charge in ezfio.nuclei_nucl_charge:
-   if charge < 5:
-      pass
-   elif charge < 13:
-      nb += 1
-   else:
-      nb += 5
+if not ezfio.pseudo_do_pseudo:
+  for charge in ezfio.nuclei_nucl_charge:
+    if charge < 5:
+        pass
+    elif charge < 13:
+        nb += 1
+    else:
+        nb += 5
 
 mo_tot_num = ezfio.mo_basis_mo_tot_num
 

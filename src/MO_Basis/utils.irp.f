@@ -112,6 +112,7 @@ subroutine mo_as_svd_vectors_of_mo_matrix(matrix,lda,m,n,label)
   double precision, intent(in)   :: matrix(lda,n)
   
   integer :: i,j
+  double precision :: accu
   double precision, allocatable  :: mo_coef_new(:,:), U(:,:),D(:), A(:,:), Vt(:,:), work(:)
   !DIR$ ATTRIBUTES ALIGN : $IRP_ALIGN :: mo_coef_new, U, Vt, A
   
@@ -137,12 +138,16 @@ subroutine mo_as_svd_vectors_of_mo_matrix(matrix,lda,m,n,label)
   write (6,'(A)') 'Eigenvalues'
   write (6,'(A)')  '-----------'
   write (6,'(A)') ''
-  write (6,'(A)')  '======== ================'
+  write (6,'(A)')  '======== ================ ================'
+  write (6,'(A)')  '   MO       Eigenvalue       Cumulative   '
+  write (6,'(A)')  '======== ================ ================'
 
+  accu = 0.d0
   do i=1,m
-    write (6,'(I8,1X,F16.10)')  i,D(i)
+    accu = accu + D(i)
+    write (6,'(I8,1X,F16.10,1X,F16.10)')  i,D(i), accu
   enddo
-  write (6,'(A)')  '======== ================'
+  write (6,'(A)')  '======== ================ ================'
   write (6,'(A)')  ''
   
   call dgemm('N','N',ao_num,m,m,1.d0,mo_coef_new,size(mo_coef_new,1),U,size(U,1),0.d0,mo_coef,size(mo_coef,1))

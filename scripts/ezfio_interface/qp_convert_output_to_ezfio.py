@@ -28,7 +28,8 @@ except:
     sys.exit(1)
 else:
     sys.path = [ QP_ROOT + "/install/EZFIO/Python", 
-                 QP_ROOT + "/resultsFile", 
+                 QP_ROOT + "/install/resultsFile", 
+                 QP_ROOT + "/install", 
                  QP_ROOT + "/scripts"] + sys.path
 
 # ~#~#~#~#~#~ #
