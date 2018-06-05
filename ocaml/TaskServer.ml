@@ -625,7 +625,7 @@ let get_data msg program_state rep_socket =
       let value = 
         match StringHashtbl.find program_state.data key with
         | Some value -> value
-        | None -> ""
+        | None -> "\0"
       in
       Message.GetDataReply (Message.GetDataReply_msg.create ~value)
       |> Message.to_string_list

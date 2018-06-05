@@ -421,8 +421,8 @@ double precision function mo_bielec_integral(i,j,k,l)
   integer, intent(in)            :: i,j,k,l
   double precision               :: get_mo_bielec_integral
   PROVIDE mo_bielec_integrals_in_map mo_integrals_cache
-  !DIR$ FORCEINLINE
   PROVIDE mo_bielec_integrals_in_map
+  !DIR$ FORCEINLINE
   mo_bielec_integral = get_mo_bielec_integral(i,j,k,l,mo_integrals_map)
   return
 end

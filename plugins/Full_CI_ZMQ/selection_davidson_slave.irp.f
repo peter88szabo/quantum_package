@@ -34,6 +34,7 @@ subroutine run_wf
   double precision :: t0, t1
   
   integer, external              :: zmq_get_dvector, zmq_get_N_det_generators 
+  integer, external              :: zmq_get_ivector
   integer, external              :: zmq_get_psi, zmq_get_N_det_selectors
   integer, external              :: zmq_get_N_states_diag
 
@@ -65,8 +66,10 @@ subroutine run_wf
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) cycle
       psi_energy(1:N_states) = energy(1:N_states)
-      TOUCH psi_energy
+      TOUCH psi_energy threshold_selectors threshold_generators
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
@@ -105,10 +108,20 @@ subroutine run_wf
       call wall_time(t0)
       if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'state_average_weight',state_average_weight,N_states) == -1) cycle
+      if (zmq_get_ivector(zmq_to_qp_run_socket,1,'pt2_stoch_istate',pt2_stoch_istate,1) == -1) cycle
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) cycle
       psi_energy(1:N_states) = energy(1:N_states)
-      TOUCH psi_energy
+      TOUCH psi_energy state_average_weight pt2_stoch_istate threshold_selectors threshold_generators
+      print *,  'N_det', N_det
+      print *,  'N_det_generators', N_det_generators
+      print *,  'N_det_selectors', N_det_selectors
+      print *,  'psi_energy', psi_energy
+      print *,  'pt2_stoch_istate', pt2_stoch_istate
+      print *,  'state_average_weight', state_average_weight
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
@@ -117,9 +130,11 @@ subroutine run_wf
       lstop = .False.
       !$OMP PARALLEL PRIVATE(i)
       i = omp_get_thread_num()
-      call run_pt2_slave(0,i,energy,lstop)
+      call run_pt2_slave(0,i,pt2_e0_denominator)
       !$OMP END PARALLEL
       print *,  'PT2 done'
+exit
+      FREE state_average_weight
 
     endif
 

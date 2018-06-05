@@ -41,6 +41,12 @@ subroutine ZMQ_selection(N_in, pt2)
     if (zmq_put_dvector(zmq_to_qp_run_socket,1,'energy',pt2_e0_denominator,size(pt2_e0_denominator)) == -1) then
       stop 'Unable to put energy on ZMQ server'
     endif
+    if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) then
+      stop 'Unable to put threshold_selectors on ZMQ server'
+    endif
+    if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) then
+      stop 'Unable to put threshold_generators on ZMQ server'
+    endif
     call create_selection_buffer(N, N*2, b)
   endif
 

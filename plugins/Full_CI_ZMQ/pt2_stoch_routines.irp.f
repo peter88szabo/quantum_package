@@ -37,10 +37,9 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
     
     state_average_weight_save(:) = state_average_weight(:)
     do pt2_stoch_istate=1,N_states
-      SOFT_TOUCH pt2_stoch_istate
       state_average_weight(:) = 0.d0
       state_average_weight(pt2_stoch_istate) = 1.d0
-      TOUCH state_average_weight 
+      TOUCH state_average_weight pt2_stoch_istate
       
       allocate(pt2_detail(N_states,N_det_generators+1), comb(N_det_generators), computed(N_det_generators), tbc(0:size_tbc))
       sumabove = 0d0
@@ -71,6 +70,7 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       integer, external              :: zmq_put_N_det_generators
       integer, external              :: zmq_put_N_det_selectors
       integer, external              :: zmq_put_dvector
+      integer, external              :: zmq_put_ivector
       if (zmq_put_psi(zmq_to_qp_run_socket,1) == -1) then
         stop 'Unable to put psi on ZMQ server'
       endif
@@ -83,6 +83,20 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       if (zmq_put_dvector(zmq_to_qp_run_socket,1,'energy',pt2_e0_denominator,size(pt2_e0_denominator)) == -1) then
         stop 'Unable to put energy on ZMQ server'
       endif
+      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'state_average_weight',pt2_e0_denominator,size(state_average_weight)) == -1) then
+        stop 'Unable to put state_average_weight on ZMQ server'
+      endif
+      if (zmq_put_ivector(zmq_to_qp_run_socket,1,'pt2_stoch_istate',pt2_stoch_istate,1) == -1) then
+        stop 'Unable to put pt2_stoch_istate on ZMQ server'
+      endif
+    if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) then
+      stop 'Unable to put threshold_selectors on ZMQ server'
+    endif
+    if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) then
+      stop 'Unable to put threshold_generators on ZMQ server'
+    endif
+
+
       call create_selection_buffer(1, 1*2, b)
       
       integer                        :: ipos

@@ -25,6 +25,12 @@ subroutine run_pt2_slave(thread,iproc,energy)
   integer :: n_tasks, k, n_tasks_max
   integer, allocatable :: i_generator(:), subset(:)
 
+!if (mpi_master) then
+!  do i=1,N_det_generators
+!    print '(I6,X,100(I10,X))' ,i,  psi_det_generators(:,:,i)
+!  enddo
+!endif
+
   n_tasks_max = N_det_generators/100+1
   allocate(task_id(n_tasks_max), task(n_tasks_max))
   allocate(pt2(N_states,n_tasks_max), i_generator(n_tasks_max), subset(n_tasks_max))
@@ -77,8 +83,8 @@ subroutine run_pt2_slave(thread,iproc,energy)
     continue 
   endif 
 
-  call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call end_zmq_push_socket(zmq_socket_push,thread)
+  call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call delete_selection_buffer(buf)
 end subroutine
 
