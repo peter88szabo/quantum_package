@@ -83,7 +83,7 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       if (zmq_put_dvector(zmq_to_qp_run_socket,1,'energy',pt2_e0_denominator,size(pt2_e0_denominator)) == -1) then
         stop 'Unable to put energy on ZMQ server'
       endif
-      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'state_average_weight',pt2_e0_denominator,size(state_average_weight)) == -1) then
+      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'state_average_weight',state_average_weight,N_states) == -1) then
         stop 'Unable to put state_average_weight on ZMQ server'
       endif
       if (zmq_put_ivector(zmq_to_qp_run_socket,1,'pt2_stoch_istate',pt2_stoch_istate,1) == -1) then

@@ -86,7 +86,7 @@ integer function zmq_get_dvector(zmq_to_qp_run_socket, worker_id, name, x, size_
       print *,  irp_here//': Unable to broadcast zmq_get_dvector'
       stop -1
     endif
-    call MPI_BCAST (x, size_x, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST (x, size_x, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
     if (ierr /= MPI_SUCCESS) then
       print *,  irp_here//': Unable to broadcast dvector'
       stop -1
