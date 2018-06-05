@@ -63,13 +63,14 @@ subroutine run_wf
 
       call wall_time(t0)
       if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
+      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'state_average_weight',state_average_weight,N_states) == -1) cycle
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
       if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle
-      if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) cycle
       psi_energy(1:N_states) = energy(1:N_states)
-      TOUCH psi_energy threshold_selectors threshold_generators
+      TOUCH psi_energy state_average_weight threshold_selectors threshold_generators
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
