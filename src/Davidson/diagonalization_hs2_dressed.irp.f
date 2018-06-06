@@ -72,7 +72,7 @@ subroutine davidson_diag_hs2(dets_in,u_in,s2_out,dim_in,energies,sze,N_st,N_st_d
   call davidson_diag_hjj_sjj(dets_in,u_in,H_jj,S2_out,energies,dim_in,sze,N_st,N_st_diag,Nint,dressing_state,converged)
   N_st_diag_local = N_st_diag
   do while (.not.converged)
-    N_st_diag_local += N_states
+    N_st_diag_local = 2 * N_st_diag_local
     allocate (energies_local(N_st_diag_local), s2_out_local(N_st_diag_local), u_in_local(sze,N_st_diag_local))
     u_in_local(1:sze,1:N_st_diag) = u_in(1:sze,1:N_st_diag) 
     call davidson_diag_hjj_sjj(dets_in,u_in_local,H_jj,s2_out_local,energies_local,dim_in,sze,N_st,N_st_diag_local,Nint,dressing_state,converged)
@@ -237,7 +237,7 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
   
   do while (.not.converged)
     itertot = itertot+1
-    if (itertot == 5) then
+    if (itertot == 8) then
       exit
     endif
 

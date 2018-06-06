@@ -50,12 +50,13 @@ subroutine run_selection_slave_new(thread,iproc,energy)
   zmq_socket_push      = new_zmq_push_socket(thread)
 
   buf%N = 0
-  n_tasks = 0
+  n_tasks = 1
   call create_selection_buffer(0, 0, buf)
   done = .False.
   do while (.not.done)
 
-    n_tasks = min(n_tasks+1,n_tasks_max)
+    n_tasks = max(1,n_tasks)
+    n_tasks = min(n_tasks,n_tasks_max)
 
     integer, external :: get_tasks_from_taskserver
     if (get_tasks_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id, task, n_tasks) == -1) then
@@ -76,11 +77,15 @@ subroutine run_selection_slave_new(thread,iproc,energy)
         buffer_ready = .True.
     endif
 
+    double precision :: time0, time1
+    call wall_time(time0)
     do k=1,n_tasks
         pt2(:,k) = 0.d0
         buf%cur = 0
         call select_connected(i_generator(k),energy,pt2(1,k),buf,subset(k))
     enddo
+    call wall_time(time1)
+
     integer, external :: tasks_done_to_taskserver
     if (tasks_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id,n_tasks) == -1) then
       done = .true.
@@ -91,6 +96,9 @@ subroutine run_selection_slave_new(thread,iproc,energy)
     buf%mini = buf2%mini
     pt2(:,:) = 0d0
     buf%cur = 0
+
+    ! Try to adjust n_tasks around 10 seconds per job
+    n_tasks = int(10.d0 * dble(n_tasks) / (time1 - time0 + 1.d-9))+1
   end do
 
   integer, external :: disconnect_from_taskserver
