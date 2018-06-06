@@ -97,8 +97,8 @@ subroutine run_selection_slave_new(thread,iproc,energy)
     pt2(:,:) = 0d0
     buf%cur = 0
 
-    ! Try to adjust n_tasks around 10 seconds per job
-    n_tasks = int(10.d0 * dble(n_tasks) / (time1 - time0 + 1.d-9))+1
+    ! Try to adjust n_tasks around 1 second per job
+    n_tasks = min(n_tasks,int( dble(n_tasks) / (time1 - time0 + 1.d-9)))+1
   end do
 
   integer, external :: disconnect_from_taskserver

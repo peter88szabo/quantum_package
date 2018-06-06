@@ -60,7 +60,7 @@ subroutine ZMQ_selection(N_in, pt2)
   task = ' ' 
 
   do i= 1, N_det_generators
-    if (i>ishft(N_det_generators,-7)) then
+    if (i>ishft(N_det_generators,-2)) then
       write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') 0, i, N
       ipos += 30
       if (ipos > 63970) then
