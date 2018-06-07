@@ -438,24 +438,46 @@ subroutine get_mo_bielec_integrals(j,k,l,sze,out_val,map)
   double precision, intent(out)  :: out_val(sze)
   type(map_type), intent(inout)  :: map
   integer                        :: i
-  integer(key_kind)              :: hash(sze)
-  real(integral_kind)            :: tmp_val(sze)
-  PROVIDE mo_bielec_integrals_in_map
+  double precision, external :: get_mo_bielec_integral
+  PROVIDE mo_bielec_integrals_in_map mo_integrals_cache
   
+  integer                        :: ii, ii0
+  integer*8                      :: ii_8, ii0_8
+  real(integral_kind)            :: tmp
+  integer(key_kind)              :: i1, idx
+  integer(key_kind)              :: p,q,r,s,i2
+  PROVIDE mo_bielec_integrals_in_map mo_integrals_cache
+
+  ii0 = l-mo_integrals_cache_min
+  ii0 = ior(ii0, k-mo_integrals_cache_min)
+  ii0 = ior(ii0, j-mo_integrals_cache_min)
+
+  ii0_8 = int(l,8)-mo_integrals_cache_min_8
+  ii0_8 = ior( ishft(ii0_8,7), int(k,8)-mo_integrals_cache_min_8)
+  ii0_8 = ior( ishft(ii0_8,7), int(j,8)-mo_integrals_cache_min_8)
+
+  q = min(j,l)
+  s = max(j,l)
+  q = q+ishft(s*s-s,-1)
+
   do i=1,sze
-    !DIR$ FORCEINLINE
-    call bielec_integrals_index(i,j,k,l,hash(i))
+    ii = ior(ii0, i-mo_integrals_cache_min)
+    if (iand(ii, -128) == 0) then
+      ii_8 = ior( ishft(ii0_8,7), int(i,8)-mo_integrals_cache_min_8)
+      out_val(i) = mo_integrals_cache(ii_8)
+    else
+      p = min(i,k)
+      r = max(i,k)
+      p = p+ishft(r*r-r,-1)
+      i1 = min(p,q)
+      i2 = max(p,q)
+      idx = i1+ishft(i2*i2-i2,-1)
+      !DIR$ FORCEINLINE
+      call map_get(map,idx,tmp)
+      out_val(i) = dble(tmp)
+    endif
   enddo
-  
-  if (key_kind == 8) then
-    call map_get_many(map, hash, out_val, sze)
-  else
-    call map_get_many(map, hash, tmp_val, sze)
-    ! Conversion to double precision 
-    do i=1,sze
-      out_val(i) = dble(tmp_val(i))
-    enddo
-  endif
+
 end
 
 subroutine get_mo_bielec_integrals_ij(k,l,sze,out_array,map)

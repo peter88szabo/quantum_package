@@ -52,6 +52,11 @@ program fci_zmq
   double precision :: error(N_states)
 
   correlation_energy_ratio = 0.d0
+  if (do_pt2) then
+    pt2_string = '        '
+  else
+    pt2_string = '(approx)'
+  endif
 
   if (.True.) then ! Avoid pre-calculation of CI_energy
     do while (                                                         &
@@ -63,7 +68,6 @@ program fci_zmq
 
 
       if (do_pt2) then
-        pt2_string = '        '
         pt2 = 0.d0
         threshold_selectors = 1.d0
         threshold_generators = 1d0 
@@ -72,8 +76,6 @@ program fci_zmq
         threshold_selectors = threshold_selectors_save
         threshold_generators = threshold_generators_save
         SOFT_TOUCH threshold_selectors threshold_generators
-      else
-        pt2_string = '(approx)'
       endif
 
 

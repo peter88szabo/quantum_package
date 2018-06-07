@@ -30,6 +30,7 @@ subroutine run_wf
   integer(ZMQ_PTR) :: zmq_to_qp_run_socket
   double precision :: energy(N_states)
   character*(64) :: states(3)
+  character*(64) :: old_state
   integer :: rc, i, ierr
   double precision :: t0, t1
   
@@ -44,13 +45,20 @@ subroutine run_wf
   states(1) = 'selection'
   states(2) = 'davidson'
   states(3) = 'pt2'
+  old_state = 'Waiting'
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
 
   do
 
     call wait_for_states(states,zmq_state,size(states))
+    if (zmq_state == old_state) then
+      cycle
+    else
+      old_state = zmq_state
+    endif
     print *,  trim(zmq_state)
+
 
     if(zmq_state(1:7) == 'Stopped') then
 

@@ -139,6 +139,7 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       endif
 
       
+      call omp_set_nested(.true.)
       !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc+1)            &
           !$OMP  PRIVATE(i)
       i = omp_get_thread_num()
@@ -149,6 +150,7 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
         call pt2_slave_inproc(i)
       endif
       !$OMP END PARALLEL
+      call omp_set_nested(.false.)
       call end_parallel_job(zmq_to_qp_run_socket, zmq_socket_pull, 'pt2')
       call delete_selection_buffer(b)
       
