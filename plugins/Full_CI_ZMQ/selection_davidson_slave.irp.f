@@ -52,26 +52,22 @@ subroutine run_wf
   do
 
     if (mpi_master) then
-      print *,  trim(zmq_state)
       call wait_for_states(states,zmq_state,size(states))
+      if (zmq_state(1:64) == old_state(1:64)) then
+        call sleep(1)
+        cycle
+      else
+        old_state(1:64) = zmq_state(1:64)
+      endif
+      print *,  trim(zmq_state)
     endif
 
     IRP_IF MPI
-      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-      if (ierr /= MPI_SUCCESS) then
-        print *,  irp_here, 'error in barrier'
-      endif
       call MPI_BCAST (zmq_state, 128, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
       if (ierr /= MPI_SUCCESS) then
         print *,  irp_here, 'error in broadcast of zmq_state'
       endif
     IRP_ENDIF
-
-    if (zmq_state == old_state) then
-      cycle
-    else
-      old_state = zmq_state
-    endif
 
     if(zmq_state(1:7) == 'Stopped') then
       exit
@@ -110,6 +106,13 @@ subroutine run_wf
       call run_selection_slave(0,i,energy)
       !$OMP END PARALLEL
       print *,  'Selection done'
+      IRP_IF MPI
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (ierr /= MPI_SUCCESS) then
+          print *,  irp_here, 'error in barrier'
+        endif
+      IRP_ENDIF
+      print *,  'All selection done'
 
     else if (zmq_state(1:8) == 'davidson') then
 
@@ -130,6 +133,13 @@ subroutine run_wf
       call davidson_slave_tcp(0)
       call omp_set_nested(.False.)
       print *,  'Davidson done'
+      IRP_IF MPI
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (ierr /= MPI_SUCCESS) then
+          print *,  irp_here, 'error in barrier'
+        endif
+      IRP_ENDIF
+      print *,  'All Davidson done'
 
     else if (zmq_state(1:3) == 'pt2') then
 
@@ -168,11 +178,19 @@ subroutine run_wf
       print *,  'PT2 done'
       FREE state_average_weight
 
+      IRP_IF MPI
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (ierr /= MPI_SUCCESS) then
+          print *,  irp_here, 'error in barrier'
+        endif
+      IRP_ENDIF
+      print *,  'All PT2 done'
+
     endif
 
   end do
   IRP_IF MPI
-    call MPI_finalize(i)
+    call MPI_finalize(ierr)
   IRP_ENDIF
 end
 

@@ -376,9 +376,14 @@ BEGIN_PROVIDER [ double precision, l3_weight, (N_states) ]
    enddo
    l3_weight(i) = min(1.d0/l3_weight(i), 100.d0)
  enddo
- print *,  'L3 weights'
- print *,  '----------'
- print *,  l3_weight(1:N_states)
+ if (mpi_master) then
+    print *,  ''
+    print *,  'L3 weights'
+    print *,  '----------'
+    print *,  ''
+    print *,  l3_weight(1:N_states)
+    print *,  ''
+ endif
 
 END_PROVIDER
 

@@ -208,7 +208,7 @@ let end_job msg program_state rep_socket pair_socket =
           address_tcp       = None;
           address_inproc    = None;
           running           = true;
-          accepting_clients = false;
+          accepting_clients = false; 
           data = StringHashtbl.create ();
         }
 

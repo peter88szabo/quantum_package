@@ -89,12 +89,12 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       if (zmq_put_ivector(zmq_to_qp_run_socket,1,'pt2_stoch_istate',pt2_stoch_istate,1) == -1) then
         stop 'Unable to put pt2_stoch_istate on ZMQ server'
       endif
-    if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) then
-      stop 'Unable to put threshold_selectors on ZMQ server'
-    endif
-    if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) then
-      stop 'Unable to put threshold_generators on ZMQ server'
-    endif
+      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) then
+        stop 'Unable to put threshold_selectors on ZMQ server'
+      endif
+      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) then
+        stop 'Unable to put threshold_generators on ZMQ server'
+      endif
 
 
       call create_selection_buffer(1, 1*2, b)
@@ -139,7 +139,6 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       endif
 
       
-      call omp_set_nested(.true.)
       !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc+1)            &
           !$OMP  PRIVATE(i)
       i = omp_get_thread_num()
@@ -150,7 +149,6 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
         call pt2_slave_inproc(i)
       endif
       !$OMP END PARALLEL
-      call omp_set_nested(.false.)
       call end_parallel_job(zmq_to_qp_run_socket, zmq_socket_pull, 'pt2')
       call delete_selection_buffer(b)
       
@@ -279,13 +277,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
   loop = .True.
   pullLoop : do while (loop)
 
-    integer, external :: zmq_delete_tasks_async_send, zmq_delete_tasks_async_recv
-    integer, external :: zmq_delete_tasks
-
     call pull_pt2_results(zmq_socket_pull, index, pt2_mwen, task_id, n_tasks)
-    if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,n_tasks,more) == -1) then
-        stop 'Unable to send delete tasks'
-    endif
     do i=1,n_tasks
       pt2_detail(1:N_states, index(i)) += pt2_mwen(1:N_states,i)
       parts_to_get(index(i)) -= 1
@@ -298,13 +290,18 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
       if(parts_to_get(index(i)) == 0) actually_computed(index(i)) = .true.
     enddo
 
-    call wall_time(time)
-
+    integer, external :: zmq_delete_tasks
+    if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,n_tasks,more) == -1) then
+      cycle
+    endif
     if (more == 0) then
       loop = .False.
     endif
 
-    if(time - timeLast > 4d0 .or. (.not.loop)) then
+    call wall_time(time)
+
+
+    if(time - timeLast > 5d0 .or. (.not.loop)) then
       timeLast = time
       do i=1, first_det_of_teeth(1)-1
         if(.not.(actually_computed(i))) then
