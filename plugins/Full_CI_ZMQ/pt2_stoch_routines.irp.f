@@ -279,7 +279,13 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
   loop = .True.
   pullLoop : do while (loop)
 
+    integer, external :: zmq_delete_tasks_async_send, zmq_delete_tasks_async_recv
+    integer, external :: zmq_delete_tasks
+
     call pull_pt2_results(zmq_socket_pull, index, pt2_mwen, task_id, n_tasks)
+    if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,n_tasks,more) == -1) then
+        stop 'Unable to send delete tasks'
+    endif
     do i=1,n_tasks
       pt2_detail(1:N_states, index(i)) += pt2_mwen(1:N_states,i)
       parts_to_get(index(i)) -= 1
@@ -292,17 +298,13 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
       if(parts_to_get(index(i)) == 0) actually_computed(index(i)) = .true.
     enddo
 
-    integer, external :: zmq_delete_tasks
-    if (zmq_delete_tasks(zmq_to_qp_run_socket,zmq_socket_pull,task_id,n_tasks,more) == -1) then
-        stop 'Unable to delete tasks'
-    endif
+    call wall_time(time)
+
     if (more == 0) then
       loop = .False.
     endif
 
-    time = omp_get_wtime()
-  
-    if(time - timeLast > 10d0 .or. (.not.loop)) then
+    if(time - timeLast > 4d0 .or. (.not.loop)) then
       timeLast = time
       do i=1, first_det_of_teeth(1)-1
         if(.not.(actually_computed(i))) then

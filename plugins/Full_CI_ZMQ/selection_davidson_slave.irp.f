@@ -51,20 +51,34 @@ subroutine run_wf
 
   do
 
-    call wait_for_states(states,zmq_state,size(states))
+    if (mpi_master) then
+      print *,  trim(zmq_state)
+      call wait_for_states(states,zmq_state,size(states))
+    endif
+
+    IRP_IF MPI
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        print *,  irp_here, 'error in barrier'
+      endif
+      call MPI_BCAST (zmq_state, 128, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
+      if (ierr /= MPI_SUCCESS) then
+        print *,  irp_here, 'error in broadcast of zmq_state'
+      endif
+    IRP_ENDIF
+
     if (zmq_state == old_state) then
       cycle
     else
       old_state = zmq_state
     endif
-    print *,  trim(zmq_state)
-
 
     if(zmq_state(1:7) == 'Stopped') then
-
       exit
+    endif
 
-    else if (zmq_state(1:9) == 'selection') then
+
+    if (zmq_state(1:9) == 'selection') then
 
       ! Selection
       ! ---------
@@ -80,12 +94,14 @@ subroutine run_wf
       psi_energy(1:N_states) = energy(1:N_states)
       TOUCH psi_energy state_average_weight threshold_selectors threshold_generators
 
-      print *,  'N_det', N_det
-      print *,  'N_det_generators', N_det_generators
-      print *,  'N_det_selectors', N_det_selectors
-      print *,  'psi_energy', psi_energy
-      print *,  'pt2_stoch_istate', pt2_stoch_istate
-      print *,  'state_average_weight', state_average_weight
+      if (mpi_master) then
+        print *,  'N_det', N_det
+        print *,  'N_det_generators', N_det_generators
+        print *,  'N_det_selectors', N_det_selectors
+        print *,  'psi_energy', psi_energy
+        print *,  'pt2_stoch_istate', pt2_stoch_istate
+        print *,  'state_average_weight', state_average_weight
+      endif
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
   
@@ -100,14 +116,15 @@ subroutine run_wf
       ! Davidson
       ! --------
 
-      print *,  'Davidson'
       call wall_time(t0)
       if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle
       if (zmq_get_N_states_diag(zmq_to_qp_run_socket,1) == -1) cycle
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states_diag) == -1) cycle
 
       call wall_time(t1)
-      call write_double(6,(t1-t0),'Broadcast time')
+      if (mpi_master) then
+        call write_double(6,(t1-t0),'Broadcast time')
+      endif
 
       call omp_set_nested(.True.)
       call davidson_slave_tcp(0)
@@ -119,7 +136,6 @@ subroutine run_wf
       ! PT2
       ! ---
 
-      print *,  'PT2'
       call wall_time(t0)
       if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
@@ -131,12 +147,14 @@ subroutine run_wf
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'state_average_weight',state_average_weight,N_states) == -1) cycle
       psi_energy(1:N_states) = energy(1:N_states)
       TOUCH psi_energy state_average_weight pt2_stoch_istate threshold_selectors threshold_generators
-      print *,  'N_det', N_det
-      print *,  'N_det_generators', N_det_generators
-      print *,  'N_det_selectors', N_det_selectors
-      print *,  'psi_energy', psi_energy
-      print *,  'pt2_stoch_istate', pt2_stoch_istate
-      print *,  'state_average_weight', state_average_weight
+      if (mpi_master) then
+        print *,  'N_det', N_det
+        print *,  'N_det_generators', N_det_generators
+        print *,  'N_det_selectors', N_det_selectors
+        print *,  'psi_energy', psi_energy
+        print *,  'pt2_stoch_istate', pt2_stoch_istate
+        print *,  'state_average_weight', state_average_weight
+      endif
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
@@ -151,13 +169,6 @@ subroutine run_wf
       FREE state_average_weight
 
     endif
-
-    IRP_IF MPI
-      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-      if (ierr /= MPI_SUCCESS) then
-        print *,  irp_here, 'error in barrier'
-      endif
-    IRP_ENDIF
 
   end do
   IRP_IF MPI
