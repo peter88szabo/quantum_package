@@ -139,7 +139,17 @@ subroutine ZMQ_pt2(E, pt2,relative_error, absolute_error, error)
       endif
 
       
-      !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc+1)            &
+      integer :: nproc_target
+      nproc_target = nproc
+      double precision :: mem
+      mem = 8.d0 * N_det * (N_int * 2.d0 * 3.d0 +  3.d0 + 5.d0) / (1024.d0**3)
+      call write_double(6,mem,'Estimated memory/thread (Gb)')
+      if (qp_max_mem > 0) then
+        nproc_target = max(1,int(dble(qp_max_mem)/mem))
+        nproc_target = min(nproc_target,nproc)
+      endif
+
+      !$OMP PARALLEL DEFAULT(shared) NUM_THREADS(nproc_target+1)            &
           !$OMP  PRIVATE(i)
       i = omp_get_thread_num()
       if (i==0) then

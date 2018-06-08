@@ -138,6 +138,7 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
   integer                        :: shift, shift2, itermax, istate
   double precision               :: r1, r2
   logical                        :: state_ok(N_st_diag*davidson_sze_max)
+  integer                        :: nproc_target
   include 'constants.include.F'
   
   !DIR$ ATTRIBUTES ALIGN : $IRP_ALIGN :: U, W, S, y, h, lambda
@@ -162,8 +163,22 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
   call write_int(6,N_st,'Number of states')
   call write_int(6,N_st_diag,'Number of states in diagonalization')
   call write_int(6,sze,'Number of determinants')
+  nproc_target = nproc
   r1 = 8.d0*(3.d0*dble(sze*N_st_diag*itermax+5.d0*(N_st_diag*itermax)**2 & 
-    + 4.d0*(N_st_diag*itermax)+nproc*(4.d0*N_det_alpha_unique+2.d0*N_st_diag*sze)))/(1024.d0**3)
+    + 3.d0*(N_st_diag*itermax)+nproc*(4.d0*N_det_alpha_unique+2.d0*N_st_diag*sze)))/(1024.d0**3)
+  if (qp_max_mem > 0) then
+    do while (r1 > qp_max_mem)
+      nproc_target = nproc_target - 1
+      r1 = 8.d0*(3.d0*dble(sze*N_st_diag*itermax+5.d0*(N_st_diag*itermax)**2 & 
+        + 3.d0*(N_st_diag*itermax)+nproc_target*(4.d0*N_det_alpha_unique+2.d0*N_st_diag*sze)))/(1024.d0**3)
+      if (nproc_target == 0) then
+        nproc_target = 1
+        exit
+      endif
+    enddo
+    call omp_set_num_threads(nproc_target)
+    call write_int(6,nproc_target,'Number of threads for diagonalization')
+  endif
   call write_double(6, r1, 'Memory(Gb)')
   write(6,'(A)') ''
   write_buffer = '====='
@@ -512,6 +527,7 @@ subroutine davidson_diag_hjj_sjj(dets_in,u_in,H_jj,s2_out,energies,dim_in,sze,N_
       y, s_, s_tmp,                                                  &
       lambda                                                         &
       )
+  call omp_set_num_threads(nproc)
 end
 
 
