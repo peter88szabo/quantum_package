@@ -70,7 +70,7 @@ program fci_zmq
       if (do_pt2) then
         pt2 = 0.d0
         threshold_selectors = 1.d0
-        threshold_generators = 1d0 
+        threshold_generators = 1.d0 
         SOFT_TOUCH threshold_selectors threshold_generators
         call ZMQ_pt2(CI_energy, pt2,relative_error,absolute_error,error) ! Stochastic PT2
         threshold_selectors = threshold_selectors_save

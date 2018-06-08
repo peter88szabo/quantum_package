@@ -601,7 +601,7 @@ subroutine end_parallel_job(zmq_to_qp_run_socket,zmq_socket_pull,name_in)
     stop 'Wrong end of job'
   endif
 
-  do i=300,1,-1
+  do i=3600,1,-1
     rc = f77_zmq_send(zmq_to_qp_run_socket, 'end_job '//trim(zmq_state),8+len(trim(zmq_state)),0)
     rc = f77_zmq_recv(zmq_to_qp_run_socket, message, 512, 0)
     if (trim(message(1:13)) == 'error waiting') then
@@ -612,6 +612,7 @@ subroutine end_parallel_job(zmq_to_qp_run_socket,zmq_socket_pull,name_in)
     endif
   end do
   if (i==0) then
+    print *,  '.. Forcing kill ..'
     rc = f77_zmq_send(zmq_to_qp_run_socket, 'end_job force',13,0)
     rc = f77_zmq_recv(zmq_to_qp_run_socket, message, 512, 0)
   endif
@@ -718,7 +719,7 @@ integer function disconnect_from_taskserver_state(zmq_to_qp_run_socket, worker_i
   rc = f77_zmq_send(zmq_to_qp_run_socket, trim(message), sze, 0)
 
   if (rc /= sze) then
-    disconnect_from_taskserver_state = -1
+    disconnect_from_taskserver_state = -2
     return
   endif
   
@@ -727,7 +728,6 @@ integer function disconnect_from_taskserver_state(zmq_to_qp_run_socket, worker_i
   
   read(message,*, end=10, err=10) reply, state
   if ((trim(reply) == 'disconnect_reply').and.(trim(state) == trim(zmq_state))) then
-    disconnect_from_taskserver_state = -1
     return
   endif
   if (trim(message) == 'error Wrong state') then
