@@ -60,8 +60,8 @@ END_PROVIDER
   psi_coef_sorted_gen(:N_det_generators, :) = psi_coef_generators(:N_det_generators, :)
   do i=1,inongen
     psi_det_sorted_gen_order(nongen(i)) = N_det_generators+i
-    psi_det_sorted_gen(:,:,:N_det_generators+i) = psi_det_sorted(:,:,nongen(i))
-    psi_coef_sorted_gen(N_det_generators+i, :) = psi_det_sorted(nongen(i),:)
+    psi_det_sorted_gen(:,:,N_det_generators+i) = psi_det_sorted(:,:,nongen(i))
+    psi_coef_sorted_gen(N_det_generators+i, :) = psi_coef_sorted(nongen(i),:)
   end do
 END_PROVIDER
 
