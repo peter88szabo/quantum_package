@@ -13,7 +13,7 @@ BEGIN_PROVIDER [ integer, N_det_generators ]
  N_det_generators = N_det
  do i=1,N_det
    norm = norm + psi_average_norm_contrib_sorted(i)
-   if (norm > threshold_generators) then
+   if (norm > threshold_generators+1d-15) then
      N_det_generators = i
      exit
    endif
@@ -34,6 +34,24 @@ END_PROVIDER
  psi_coef_generators(1:N_det,1:N_states) = psi_coef_sorted(1:N_det,1:N_states)
 
 END_PROVIDER
+
+ BEGIN_PROVIDER [ integer(bit_kind), psi_det_sorted_gen, (N_int,2,psi_det_size) ]
+&BEGIN_PROVIDER [ double precision, psi_coef_sorted_gen, (psi_det_size,N_states) ]
+&BEGIN_PROVIDER [ integer, psi_det_sorted_gen_order,     (psi_det_size)  ]
+
+ implicit none
+ BEGIN_DOC
+ ! For Single reference wave functions, the generator is the
+ ! Hartree-Fock determinant
+ END_DOC
+ integer                        :: i, k
+ psi_det_sorted_gen = psi_det_sorted
+ psi_coef_sorted_gen = psi_coef_sorted
+ !do i=1,N_det_generators
+   psi_det_sorted_gen_order = psi_det_sorted_order
+ !end do
+END_PROVIDER
+
 
 BEGIN_PROVIDER [integer, degree_max_generators]
  implicit none

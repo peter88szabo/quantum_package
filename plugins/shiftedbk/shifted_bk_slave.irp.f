@@ -1,8 +1,15 @@
-program bk_slave
+program shifted_bk
   implicit none
   BEGIN_DOC
 ! Helper subroutine to compute the dress in distributed mode.
   END_DOC
-  call dress_slave
+  
+  PROVIDE psi_bilinear_matrix_columns_loc psi_det_alpha_unique psi_det_beta_unique
+  PROVIDE psi_bilinear_matrix_rows psi_det_sorted_gen_order psi_bilinear_matrix_order
+  PROVIDE psi_bilinear_matrix_transp_rows_loc psi_bilinear_matrix_transp_columns
+  PROVIDE psi_bilinear_matrix_transp_order
+
+  !call diagonalize_CI()
+  call dress_slave()
 end
 

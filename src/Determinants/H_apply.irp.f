@@ -194,6 +194,7 @@ subroutine copy_H_apply_buffer_to_wf
   
 !  logical :: found_duplicates
 !  call remove_duplicates_in_psi_det(found_duplicates)
+
 end
 
 subroutine remove_duplicates_in_psi_det(found_duplicates)
