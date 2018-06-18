@@ -35,6 +35,24 @@ END_PROVIDER
 
 END_PROVIDER
 
+ BEGIN_PROVIDER [ integer(bit_kind), psi_det_sorted_gen, (N_int,2,psi_det_size) ]
+&BEGIN_PROVIDER [ double precision, psi_coef_sorted_gen, (psi_det_size,N_states) ]
+&BEGIN_PROVIDER [ integer, psi_det_sorted_gen_order,     (psi_det_size)  ]
+
+ implicit none
+ BEGIN_DOC
+ ! For Single reference wave functions, the generator is the
+ ! Hartree-Fock determinant
+ END_DOC
+ integer                        :: i, k
+ psi_det_sorted_gen = psi_det_sorted
+ psi_coef_sorted_gen = psi_coef_sorted
+ !do i=1,N_det_generators
+   psi_det_sorted_gen_order = psi_det_sorted_order
+ !end do
+END_PROVIDER
+
+
 BEGIN_PROVIDER [integer, degree_max_generators]
  implicit none
  BEGIN_DOC
