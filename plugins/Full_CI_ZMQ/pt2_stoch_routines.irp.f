@@ -570,7 +570,7 @@ END_PROVIDER
   comb_step = 1d0/dfloat(comb_teeth)
   first_det_of_comb = 1
   do i=1,N_det_generators
-    if(pt2_weight(i)/norm_left < .25d0*comb_step) then
+    if(pt2_weight(i)/norm_left < .5d0*comb_step) then
       first_det_of_comb = i
       exit
     end if
