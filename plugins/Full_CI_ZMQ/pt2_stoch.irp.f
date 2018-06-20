@@ -27,6 +27,7 @@ subroutine run
   threshold_generators = 1.d0 
   relative_error = 1.d-3
   absolute_error = 1.d-5
+
   call ZMQ_pt2(E_CI_before, pt2, relative_error, absolute_error, eqt)
   print *,  'Final step'
   print *,  'N_det    = ', N_det

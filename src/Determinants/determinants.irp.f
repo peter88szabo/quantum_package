@@ -321,21 +321,24 @@ end subroutine
    END_DOC
    
    call sort_dets_by_det_search_key(N_det, psi_det, psi_coef,        &
-       psi_det_sorted_bit, psi_coef_sorted_bit)
+       psi_det_sorted_bit, psi_coef_sorted_bit, N_states)
 END_PROVIDER
  
-subroutine sort_dets_by_det_search_key(Ndet, det_in, coef_in, det_out, coef_out)
+subroutine sort_dets_by_det_search_key(Ndet, det_in, coef_in, det_out, coef_out, N_st)
    use bitmasks
    implicit none
-   integer, intent(in)            :: Ndet
+   integer, intent(in)            :: Ndet, N_st
    integer(bit_kind), intent(in)  :: det_in  (N_int,2,psi_det_size)
-   double precision , intent(in)  :: coef_in(psi_det_size,N_states)
+   double precision , intent(in)  :: coef_in(psi_det_size,N_st)
    integer(bit_kind), intent(out) :: det_out (N_int,2,psi_det_size)
-   double precision , intent(out) :: coef_out(psi_det_size,N_states)
+   double precision , intent(out) :: coef_out(psi_det_size,N_st)
    BEGIN_DOC
    ! Determinants are sorted are sorted according to their det_search_key.
    ! Useful to accelerate the search of a random determinant in the wave
    ! function.
+   !
+   ! /!\ The first dimension of coef_out and coef_in need to be psi_det_size
+   !
    END_DOC
    integer                        :: i,j,k
    integer, allocatable           :: iorder(:)
@@ -356,7 +359,7 @@ subroutine sort_dets_by_det_search_key(Ndet, det_in, coef_in, det_out, coef_out)
        det_out(j,1,i) = det_in(j,1,iorder(i))
        det_out(j,2,i) = det_in(j,2,iorder(i))
      enddo
-     do k=1,N_states
+     do k=1,N_st
        coef_out(i,k) = coef_in(iorder(i),k)
      enddo
    enddo
