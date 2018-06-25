@@ -28,7 +28,7 @@ subroutine run_wf
   double precision :: energy(N_states_diag)
   character*(64) :: states(1)
   integer :: rc, i
-integer, external              :: zmq_get_dvector, zmq_get_N_det_generators 
+  integer, external              :: zmq_get_dvector, zmq_get_N_det_generators 
   integer, external              :: zmq_get_psi, zmq_get_N_det_selectors
   integer, external              :: zmq_get_N_states_diag
   double precision               :: tmp

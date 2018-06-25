@@ -208,7 +208,7 @@ let end_job msg program_state rep_socket pair_socket =
           address_tcp       = None;
           address_inproc    = None;
           running           = true;
-          accepting_clients = false; 
+          accepting_clients = false;
           data = StringHashtbl.create ();
         }
 
@@ -625,7 +625,7 @@ let get_data msg program_state rep_socket =
       let value = 
         match StringHashtbl.find program_state.data key with
         | Some value -> value
-        | None -> "\0"
+        | None -> "\000"
       in
       Message.GetDataReply (Message.GetDataReply_msg.create ~value)
       |> Message.to_string_list

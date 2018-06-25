@@ -60,7 +60,8 @@ subroutine ZMQ_selection(N_in, pt2)
   task = ' ' 
 
   do i= 1, N_det_generators
-    if (i>ishft(N_det_generators,-2)) then
+!    /!\ Fragments don't work
+!    if (i>-ishft(N_det_generators,-2)) then
       write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') 0, i, N
       ipos += 30
       if (ipos > 63970) then
@@ -69,18 +70,18 @@ subroutine ZMQ_selection(N_in, pt2)
         endif
         ipos=1
       endif
-    else
-      do j=1,fragment_count
-        write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') j, i, N
-        ipos += 30
-        if (ipos > 63970) then
-          if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
-            stop 'Unable to add task to task server'
-          endif
-          ipos=1
-        endif
-      end do
-    endif
+!    else
+!      do j=1,fragment_count
+!        write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') j, i, N
+!        ipos += 30
+!        if (ipos > 63970) then
+!          if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
+!            stop 'Unable to add task to task server'
+!          endif
+!          ipos=1
+!        endif
+!      end do
+!    endif
   enddo
   if (ipos > 1) then
     if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
