@@ -13,7 +13,7 @@ BEGIN_PROVIDER [ integer, N_det_generators ]
  N_det_generators = N_det
  do i=1,N_det
    norm = norm + psi_average_norm_contrib_sorted(i)
-   if (norm > threshold_generators+1d-15) then
+   if (norm >= threshold_generators) then
      N_det_generators = i
      exit
    endif
@@ -47,9 +47,7 @@ END_PROVIDER
  integer                        :: i, k
  psi_det_sorted_gen = psi_det_sorted
  psi_coef_sorted_gen = psi_coef_sorted
- !do i=1,N_det_generators
-   psi_det_sorted_gen_order = psi_det_sorted_order
- !end do
+ psi_det_sorted_gen_order = psi_det_sorted_order
 END_PROVIDER
 
 

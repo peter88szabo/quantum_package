@@ -25,12 +25,6 @@ subroutine run_pt2_slave(thread,iproc,energy)
   integer :: n_tasks, k, n_tasks_max
   integer, allocatable :: i_generator(:), subset(:)
 
-!if (mpi_master) then
-!  do i=1,N_det_generators
-!    print '(I6,X,100(I10,X))' ,i,  psi_det_generators(:,:,i)
-!  enddo
-!endif
-
   n_tasks_max = N_det_generators/100+1
   allocate(task_id(n_tasks_max), task(n_tasks_max))
   allocate(pt2(N_states,n_tasks_max), i_generator(n_tasks_max), subset(n_tasks_max))
@@ -67,23 +61,24 @@ subroutine run_pt2_slave(thread,iproc,energy)
       read (task(k),*) subset(k), i_generator(k)
     enddo
 
-    double precision :: time0, time1
-    call wall_time(time0)
+!    double precision :: time0, time1
+!    call wall_time(time0)
     do k=1,n_tasks
         pt2(:,k) = 0.d0
         buf%cur = 0
         call select_connected(i_generator(k),energy,pt2(1,k),buf,subset(k))
     enddo
-    call wall_time(time1)
-
+!    call wall_time(time1)
+!
     integer, external :: tasks_done_to_taskserver
     if (tasks_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id,n_tasks) == -1) then
       done = .true.
     endif
     call push_pt2_results(zmq_socket_push, i_generator, pt2, task_id, n_tasks)
 
-    ! Try to adjust n_tasks around 5 second per job
-    n_tasks = min(n_tasks,int( 5.d0*dble(n_tasks) / (time1 - time0 + 1.d-9)))+1
+!    ! Try to adjust n_tasks around 5 second per job
+!    n_tasks = min(n_tasks,int( 5.d0*dble(n_tasks) / (time1 - time0 + 1.d-9)))+1
+     n_tasks = n_tasks+1
   end do
 
   integer, external :: disconnect_from_taskserver

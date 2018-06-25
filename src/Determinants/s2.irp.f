@@ -190,7 +190,7 @@ subroutine S2_u_0_nstates(v_0,u_0,n,keys_tmp,Nint,N_st,sze_8)
   vt = 0.d0
   
   do sh=1,shortcut(0,1)
-    !$OMP DO 
+    !$OMP DO SCHEDULE(static,1)
     do sh2=sh,shortcut(0,1)
       exa = 0
       do ni=1,Nint
