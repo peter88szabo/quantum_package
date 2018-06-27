@@ -108,6 +108,6 @@ source $QP_ROOT/tests/bats/common.bats.sh
   ezfio set_file TMP
   energy="$(ezfio get mrcepa0 energy_pt2)"
   rm -rf TMP
-  eq $energy -76.2411825032868 2.e-4
+  eq $energy -76.2407388142333 2.e-4
 }
 
