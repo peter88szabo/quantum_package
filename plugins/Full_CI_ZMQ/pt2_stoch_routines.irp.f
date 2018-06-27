@@ -341,12 +341,12 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
         prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))
         E0 += pt2_detail(pt2_stoch_istate,first_det_of_teeth(tooth)) * prop
         avg = E0 + (sumabove(tooth) / Nabove(tooth))
-        eqt = sqrt(1d0 / (Nabove(tooth)-1) * abs(sum2above(tooth) / Nabove(tooth) - (sumabove(tooth)/Nabove(tooth))**2))
+        eqt = sqrt(1d0 / (Nabove(tooth)-1.d0) * abs(sum2above(tooth) / Nabove(tooth) - (sumabove(tooth)/Nabove(tooth))**2))
       else
         eqt = 0.d0
       endif
       call wall_time(time)
-      if ( ((dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error)) .and. Nabove(tooth) >= 10) then
+      if ( ((dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error)) .and. Nabove(tooth) >= 10.d0) then
         ! Termination
         pt2(pt2_stoch_istate) = avg
         error(pt2_stoch_istate) = eqt
@@ -358,7 +358,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
           endif
         endif
       else
-        if (Nabove(tooth) > Nabove_old) then
+        if ( (Nabove(tooth) > 2.d0) .and. (Nabove(tooth) > Nabove_old) ) then
           print '(G10.3, 2X, F16.10, 2X, G16.3, 2X, F16.4, A20)', Nabove(tooth), avg+E, eqt, time-time0, ''
           Nabove_old = Nabove(tooth)
         endif
@@ -378,16 +378,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
     pt2(pt2_stoch_istate) = E0 + (sumabove(tooth) / Nabove(tooth))
     error(pt2_stoch_istate) = sqrt(1d0 / (Nabove(tooth)-1) * abs(sum2above(tooth) / Nabove(tooth) - (sumabove(tooth)/Nabove(tooth))**2))
   end if
-  
-!=======
-! 
-!  E0 = sum(pt2_detail(pt2_stoch_istate,:first_det_of_teeth(tooth)-1))
-!  prop = ((1d0 - dfloat(comb_teeth - tooth + 1) * comb_step) - pt2_cweight(first_det_of_teeth(tooth)-1))
-!  prop = prop * pt2_weight_inv(first_det_of_teeth(tooth))
-!  E0 += pt2_detail(pt2_stoch_istate,first_det_of_teeth(tooth)) * prop
-!  pt2(pt2_stoch_istate) = E0 + (sumabove(tooth) / Nabove(tooth))
-!
-!>>>>>>> master
+
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call sort_selection_buffer(b)
 end subroutine
