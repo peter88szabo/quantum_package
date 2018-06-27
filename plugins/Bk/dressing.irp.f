@@ -64,4 +64,3 @@ subroutine dress_with_alpha_buffer(Nstates,Ndet,Nint,delta_ij_loc, i_gen, minili
 end subroutine
 
 
-
