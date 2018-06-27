@@ -561,7 +561,7 @@ subroutine add_comb(com, computed, cp, N, tbc)
   implicit none
   double precision, intent(in) :: com
   integer, intent(inout) :: N
-  double precision, intent(inout) :: cp(N_det_non_ref)
+  double precision, intent(inout) :: cp(N_det_generators)
   logical, intent(inout) :: computed(N_det_generators)
   integer, intent(inout) :: tbc(N_det_generators)
   integer :: i, k, l, dets(comb_teeth)
