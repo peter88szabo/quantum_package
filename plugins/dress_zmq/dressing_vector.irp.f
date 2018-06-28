@@ -18,7 +18,6 @@
    do j = 1, n_det
      dressing_column_h(j,k) = delta_ij(k,j,1) 
      dressing_column_s(j,k) = delta_ij(k,j,2)
-!     print *, j, delta_ij(k,j,:)
    enddo
  enddo
 END_PROVIDER
