@@ -400,12 +400,13 @@ end function
 &BEGIN_PROVIDER [ integer, comb_teeth ]
 &BEGIN_PROVIDER [ integer, N_cps_max ]
   implicit none
+  integer :: comb_per_cp
   comb_teeth = 16
-  N_cps_max = 128
-  !comb_per_cp = 64
+  N_cps_max = 64
+!  comb_per_cp = 64
   gen_per_cp = (N_det_generators / N_cps_max) + 1
-  N_cps_max += 1
-  !N_cps_max = N_det_generators / comb_per_cp + 1
+!  N_cps_max += 1
+  N_cps_max = N_det_generators / gen_per_cp + 1
 END_PROVIDER
 
 
@@ -525,6 +526,11 @@ subroutine get_comb_val(stato, detail, cur_cp, val)
   val = 0d0
   first = cp_first_tooth(cur_cp) 
 
+  !TODO : check 
+  if (first == 0) then
+    return
+  endif
+
   do j = comb_teeth, first, -1
     !DIR$ FORCEINLINE
     k = mrcc_find(curs, mrcc_cweight,size(mrcc_cweight), first_det_of_teeth(j), first_det_of_teeth(j+1))
@@ -590,7 +596,7 @@ end subroutine
 &BEGIN_PROVIDER [ double precision, mrcc_cweight_cache, (N_det_generators) ]
 &BEGIN_PROVIDER [ double precision, fractage, (comb_teeth) ]
 &BEGIN_PROVIDER [ double precision, comb_step ]
-&BEGIN_PROVIDER [ integer, first_det_of_teeth, (comb_teeth+1) ]
+&BEGIN_PROVIDER [ integer, first_det_of_teeth, (0:comb_teeth+1) ]
 &BEGIN_PROVIDER [ integer, first_det_of_comb ]
 &BEGIN_PROVIDER [ integer, tooth_of_det, (N_det_generators) ]
   implicit none
@@ -649,6 +655,7 @@ end subroutine
   end do
   first_det_of_teeth(comb_teeth+1) = N_det_generators + 1
   first_det_of_teeth(1) = first_det_of_comb
+  first_det_of_teeth(0) = 1
   
 
   if(first_det_of_teeth(1) /= first_det_of_comb) then
