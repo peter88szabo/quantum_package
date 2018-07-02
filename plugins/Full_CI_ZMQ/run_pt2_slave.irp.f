@@ -46,8 +46,8 @@ subroutine run_pt2_slave(thread,iproc,energy)
   done = .False.
   do while (.not.done)
 
-!    n_tasks = max(1,n_tasks)
-!    n_tasks = min(n_tasks,n_tasks_max)
+    n_tasks = max(1,n_tasks)
+    n_tasks = min(n_tasks,n_tasks_max)
 
     integer, external :: get_tasks_from_taskserver
     if (get_tasks_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id, task, n_tasks) == -1) then
