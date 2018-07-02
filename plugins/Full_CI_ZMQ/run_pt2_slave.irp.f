@@ -46,8 +46,8 @@ subroutine run_pt2_slave(thread,iproc,energy)
   done = .False.
   do while (.not.done)
 
-!    n_tasks = max(1,n_tasks)
-!    n_tasks = min(n_tasks,n_tasks_max)
+    n_tasks = max(1,n_tasks)
+    n_tasks = min(n_tasks,n_tasks_max)
 
     integer, external :: get_tasks_from_taskserver
     if (get_tasks_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id, task, n_tasks) == -1) then
@@ -152,9 +152,9 @@ subroutine pull_pt2_results(zmq_socket_pull, index, pt2, task_id, n_tasks)
   use selection_types
   implicit none
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
-  double precision, intent(inout) :: pt2(N_states,*)
-  integer, intent(out) :: index(*)
-  integer, intent(out) :: n_tasks, task_id(*)
+  double precision, intent(inout) :: pt2(N_states,n_tasks_max)
+  integer, intent(out) :: index(n_tasks_max)
+  integer, intent(out) :: n_tasks, task_id(n_tasks_max)
   integer :: rc, rn, i
 
   rc = f77_zmq_recv( zmq_socket_pull, n_tasks, 4, 0)
