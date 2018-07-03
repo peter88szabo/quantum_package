@@ -127,6 +127,7 @@ def write_ezfio(res, filename):
     coefficient = []
     exponent = []
 
+    res.convert_to_cartesian()
     # ~#~#~#~#~#~#~ #
     # P a r s i n g #
     # ~#~#~#~#~#~#~ #
