@@ -93,6 +93,7 @@ def write_ezfio(res, filename):
             coord_y.append(a.coord[1] / a0)
             coord_z.append(a.coord[2] / a0)
 
+
     # ~#~#~#~#~ #
     # W r i t e #
     # ~#~#~#~#~ #
@@ -125,9 +126,6 @@ def write_ezfio(res, filename):
     power_z = []
     coefficient = []
     exponent = []
-
-    res.clean_contractions()
-    res.convert_to_cartesian()
 
     # ~#~#~#~#~#~#~ #
     # P a r s i n g #
