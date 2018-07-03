@@ -366,6 +366,12 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
     end if
   end do pullLoop
 
+  if (zmq_abort(zmq_to_qp_run_socket) == -1) then
+    call sleep(1)
+    if (zmq_abort(zmq_to_qp_run_socket) == -1) then
+      print *, irp_here, ': Error in sending abort signal (2)'
+    endif
+  endif
 
   if(tooth == comb_teeth+1) then
     pt2(pt2_stoch_istate) = sum(pt2_detail(pt2_stoch_istate,:))

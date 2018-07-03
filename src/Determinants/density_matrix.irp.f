@@ -365,7 +365,7 @@ end
 BEGIN_PROVIDER [ double precision, l3_weight, (N_states) ]
  implicit none
  BEGIN_DOC
- ! Weight of the states in the selection : 1/(sum_i c_i^4)
+ ! Weight of the states in the selection : 1/(sum_i |c_i|^3)
  END_DOC
  integer :: i,k
  double precision :: c
@@ -388,6 +388,30 @@ BEGIN_PROVIDER [ double precision, l3_weight, (N_states) ]
 
 END_PROVIDER
 
+BEGIN_PROVIDER [ double precision, c0_weight, (N_states) ]
+ implicit none
+ BEGIN_DOC
+ ! Weight of the states in the selection : 1/c_0^2
+ END_DOC
+ integer :: i,k
+ double precision :: c
+ do i=1,N_states
+   c0_weight(i) = 1.d-31
+   c = maxval(psi_coef(:,i) * psi_coef(:,i))
+   c0_weight(i) = 1.d0/c
+   c0_weight(i) = min(c0_weight(i), 100.d0)
+ enddo
+ if (mpi_master) then
+    print *,  ''
+    print *,  'c0 weights'
+    print *,  '----------'
+    print *,  ''
+    print *,  c0_weight(1:N_states)
+    print *,  ''
+ endif
+
+END_PROVIDER
+
 
 BEGIN_PROVIDER [ double precision, state_average_weight, (N_states) ]
  implicit none
@@ -397,8 +421,12 @@ BEGIN_PROVIDER [ double precision, state_average_weight, (N_states) ]
  logical :: exists
 
  state_average_weight(:) = 1.d0
- if (use_l3_weight) then
-  state_average_weight(:) = l3_weight(:)
+ if (used_weight == 0) then
+  state_average_weight(:) = c0_weight(:)
+ else if (used_weight == 1) then
+  state_average_weight(:) = 1./N_states
+ else if (used_weight == 3) then
+  state_average_weight(:) = l3_weight
  else
   call ezfio_has_determinants_state_average_weight(exists)
   if (exists) then
