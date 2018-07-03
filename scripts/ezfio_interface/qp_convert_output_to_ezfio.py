@@ -324,7 +324,6 @@ def write_ezfio(res, filename):
         ezfio.set_electrons_elec_beta_num(n_beta)
     
     except:
-        raise
         ezfio.set_pseudo_do_pseudo(False)
     else:
         ezfio.set_pseudo_do_pseudo(True)
