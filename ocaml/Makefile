@@ -12,7 +12,7 @@ endif
 LIBS=
 PKGS=
 OCAMLCFLAGS="-g"
-OCAMLOPTFLAGS="opt -O3 -nodynlink -remove-unused-arguments -rounds 16 -inline 100 -inline-max-unroll 100"
+OCAMLOPTFLAGS="opt -O3 -remove-unused-arguments -rounds 16 -inline 100 -inline-max-unroll 100"
 OCAMLBUILD=ocamlbuild -j 0 -cflags $(OCAMLCFLAGS) -lflags $(OCAMLCFLAGS) -ocamlopt $(OCAMLOPTFLAGS)
 MLLFILES=$(wildcard *.mll) 
 MLFILES=$(wildcard *.ml) ezfio.ml Qptypes.ml Input_auto_generated.ml qp_edit.ml 

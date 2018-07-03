@@ -115,6 +115,7 @@ END_PROVIDER
       ao_num,ao_ortho_canonical_coef,size(ao_ortho_canonical_coef,1), &
       ao_ortho_canonical_num)
 
+
   else
 
     double precision, allocatable :: S(:,:)
@@ -134,13 +135,6 @@ END_PROVIDER
       S, size(S,1), &
       0.d0, ao_ortho_canonical_coef, size(ao_ortho_canonical_coef,1))
 
-!integer :: j
-!do i=1,ao_num
-! do j=1,ao_num
-!  print *,  i,j, ao_ortho_canonical_coef(i,j)
-! enddo
-!enddo
-!stop
     deallocate(S)
   endif
 END_PROVIDER
