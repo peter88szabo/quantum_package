@@ -236,6 +236,7 @@ subroutine mrcc_part_dress(delta_ij_, delta_ij_s2_, i_generator,n_selected,det_b
   double precision, intent(inout) :: contrib(N_states)
   double precision :: sdress, hdress
 
+  PROVIDE n_act_orb elec_num
 
   if (perturbative_triples) then
     PROVIDE one_anhil fock_virt_total fock_core_inactive_total one_creat
@@ -1025,7 +1026,7 @@ subroutine filter_tq(i_generator,n_selected,det_buffer,Nint,tq,N_tq,miniList,N_m
     if (good) then
       if (.not. is_in_wavefunction(det_buffer(1,1,i),Nint)) then
         N_tq += 1
-        do k=1,N_int
+        do k=1,Nint
           tq(k,1,N_tq) = det_buffer(k,1,i)
           tq(k,2,N_tq) = det_buffer(k,2,i)
         enddo
@@ -1131,6 +1132,7 @@ subroutine get_cc_coef(tq,c_alpha)
   integer                        :: i_state, k_sd, l_sd, i_I
   logical                        :: ok
   
+  PROVIDE n_act_orb elec_num
   if (perturbative_triples) then
     PROVIDE one_anhil fock_virt_total fock_core_inactive_total one_creat
   endif

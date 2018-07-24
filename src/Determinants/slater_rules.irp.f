@@ -568,7 +568,6 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
       call get_mono_excitation_from_fock(key_i,key_j,p,m,spin,phase,hij)
       
     case (0)
-      print *,irp_here,": ZERO"
       double precision, external :: diag_S_mat_elem
       s2 = diag_S_mat_elem(key_i,Nint)
       hij = diag_H_mat_elem(key_i,Nint)

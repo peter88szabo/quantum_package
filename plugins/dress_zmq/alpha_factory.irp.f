@@ -66,7 +66,7 @@ subroutine generate_singles_and_doubles(delta_ij_loc, i_generator, bitmask_index
   integer(bit_kind), allocatable:: preinteresting_det(:,:,:)
   integer ,allocatable :: abuf(:), labuf(:)
   
-  allocate(abuf(N_det*6), labuf(N_det))
+  allocate(abuf(0:N_det*6), labuf(0:N_det))
   allocate(preinteresting_det(N_int,2,N_det))
   
   PROVIDE fragment_count
@@ -387,7 +387,7 @@ subroutine alpha_callback_mask(delta_ij_loc, i_gen, sp, mask, bannedOrb, banned,
   integer(bit_kind), allocatable :: det_minilist(:,:,:)
 
 
-  allocate(abuf(siz), labuf(N_det), putten(N_det), det_minilist(N_int, 2, N_det))
+  allocate(abuf(0:siz), labuf(0:N_det), putten(N_det), det_minilist(N_int, 2, N_det))
   
   do i=1,siz
     abuf(i) = psi_from_sorted_gen(rabuf(i))
@@ -638,7 +638,7 @@ subroutine splash_pq(mask, sp, det, i_gen, N_sel, bannedOrb, banned, indexes, ab
   integer(bit_kind),intent(in)   :: mask(N_int, 2), det(N_int, 2, N_sel)
   logical, intent(inout)         :: bannedOrb(mo_tot_num, 2), banned(mo_tot_num, mo_tot_num, 2)
   integer, intent(inout)         :: indexes(0:mo_tot_num, 0:mo_tot_num)
-  integer, intent(inout) :: abuf(*)
+  integer, intent(inout) :: abuf(0:*)
   integer                        :: i, ii, j, k, l, h(0:2,2), p(0:4,2), nt, s
   integer(bit_kind)              :: perMask(N_int, 2), mobMask(N_int, 2), negMask(N_int, 2)
   integer :: phasemask(2,N_int*bit_kind_size)
@@ -704,7 +704,7 @@ subroutine get_d2(i_gen, gen, banned, bannedOrb, indexes, abuf, mask, h, p, sp)
   implicit none
 
   integer(bit_kind), intent(in) :: mask(N_int, 2), gen(N_int, 2)
-  integer, intent(inout) :: abuf(*)
+  integer, intent(inout) :: abuf(0:*)
   integer, intent(in) :: i_gen
   logical, intent(in) :: bannedOrb(mo_tot_num, 2), banned(mo_tot_num, mo_tot_num,2)
   integer, intent(inout) :: indexes(0:mo_tot_num, 0:mo_tot_num)
@@ -832,7 +832,7 @@ subroutine get_d1(i_gen, gen, banned, bannedOrb, indexes, abuf, mask, h, p, sp)
   implicit none
 
   integer(bit_kind), intent(in)  :: mask(N_int, 2), gen(N_int, 2)
-  integer, intent(inout)         :: abuf(*)
+  integer, intent(inout)         :: abuf(0:*)
   integer,intent(in)             :: i_gen
   logical, intent(in)            :: bannedOrb(mo_tot_num, 2), banned(mo_tot_num, mo_tot_num,2)
   integer(bit_kind)              :: det(N_int, 2)
