@@ -1164,6 +1164,10 @@ subroutine get_cc_coef(tq,c_alpha)
     ! <I|  <>  |alpha>
     do k_sd=1,N_det_non_ref
       
+      if (maxval(abs(psi_non_ref_coef(k_sd,1:N_states))) < 1.d-10) then
+        cycle
+      endif
+
       call get_excitation_degree(tq,psi_non_ref(1,1,k_sd),degree,N_int)
       if (degree > 2) then
         cycle
@@ -1173,6 +1177,15 @@ subroutine get_cc_coef(tq,c_alpha)
       if (degree > 2) then
         cycle
       endif
+
+      do i_state=1,N_states
+        dIK(i_state) = dij(i_I, k_sd, i_state)
+      enddo
+
+      if (maxval(abs(dIk))) < 1.d-10) then
+        cycle
+      endif
+
       
       ! <I| /k\ |alpha>
       
@@ -1184,17 +1197,14 @@ subroutine get_cc_coef(tq,c_alpha)
 
       call apply_excitation(psi_ref(1,1,i_I), exc, tmp_det, ok, N_int)
       
-      do i_state=1,N_states
-        dIK(i_state) = dij(i_I, k_sd, i_state)
-      enddo
-      
       ! <I| \l/ |alpha>
-      do i_state=1,N_states
-        dka(i_state) = 0.d0
-      enddo
+      dka(1:N_states) = 0.d0
       
       if (ok) then
         do l_sd=k_sd+1,N_det_non_ref
+          if (maxval(abs(psi_non_ref_coef(l_sd,1:N_states))) < 1.d-10) then
+            cycle
+          endif
           call get_excitation_degree(tmp_det,psi_non_ref(1,1,l_sd),degree,N_int)
           if (degree == 0) then
             call get_excitation(psi_ref(1,1,i_I),psi_non_ref(1,1,l_sd),exc,degree,phase2,N_int)
