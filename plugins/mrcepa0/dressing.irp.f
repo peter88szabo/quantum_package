@@ -216,11 +216,9 @@ subroutine mrcc_part_dress(delta_ij_, delta_ij_s2_, i_generator,n_selected,det_b
   double precision               :: hIk, hla, hIl, sla, dIk(N_states), dka(N_states), dIa(N_states), hka
   double precision, allocatable  :: dIa_hla(:,:), dIa_sla(:,:)
   double precision               :: haj, phase, phase2
-  double precision               :: f(N_states), ci_inv(N_states)
   integer                        :: exc(0:2,2,2)
   integer                        :: h1,h2,p1,p2,s1,s2
   integer(bit_kind)              :: tmp_det(Nint,2)
-  integer                        :: iint, ipos
   integer                        :: i_state, k_sd, l_sd, i_I, i_alpha
   
   integer(bit_kind),allocatable  :: miniList(:,:,:)
@@ -422,9 +420,6 @@ subroutine mrcc_part_dress(delta_ij_, delta_ij_s2_, i_generator,n_selected,det_b
         enddo
       enddo
      
-      do i_state=1,N_states
-        ci_inv(i_state) = psi_ref_coef_inv(i_I,i_state)
-      enddo
       do l_sd=1,idx_alpha(0)
         k_sd = idx_alpha(l_sd)
         hla = hij_cache(k_sd)
@@ -1118,3 +1113,135 @@ end
 
 
 
+subroutine get_cc_coef(tq,c_alpha)
+  use bitmasks
+  implicit none
+  
+  integer(bit_kind), intent(in)  :: tq(N_int,2)
+  double precision, intent(out)  :: c_alpha(N_states)
+  
+  integer                        :: k
+  integer                        :: degree1, degree2, degree
+  
+  double precision               :: hla, hka, dIk(N_states), dka(N_states), dIa(N_states)
+  double precision               :: phase, phase2
+  integer                        :: exc(0:2,2,2)
+  integer                        :: h1,h2,p1,p2,s1,s2
+  integer(bit_kind)              :: tmp_det(N_int,2)
+  integer                        :: i_state, k_sd, l_sd, i_I
+  logical                        :: ok
+  
+  if (perturbative_triples) then
+    PROVIDE one_anhil fock_virt_total fock_core_inactive_total one_creat
+  endif
+  
+  
+  c_alpha(1:N_states) = 0.d0
+  
+  do i_I=1,N_det_ref
+    ! Find triples and quadruple grand parents
+    call get_excitation_degree(tq,psi_ref(1,1,i_I),degree1,N_int)
+    if (degree1 < 3) then
+      return
+    endif
+  enddo
+  
+  ! |I>
+  do i_I=1,N_det_ref
+    ! Find triples and quadruple grand parents
+    call get_excitation_degree(tq,psi_ref(1,1,i_I),degree1,N_int)
+    if (degree1 > 4) then
+      cycle
+    endif
+    if ( (degree1 < 3).or.(degree1 > 4) ) stop 'bug'
+    
+    do i_state=1,N_states
+      dIa(i_state) = 0.d0
+    enddo
+    
+    ! <I|  <>  |alpha>
+    do k_sd=1,N_det_non_ref
+      
+      call get_excitation_degree(tq,psi_non_ref(1,1,k_sd),degree,N_int)
+      if (degree > 2) then
+        cycle
+      endif
+
+      call get_excitation_degree(psi_ref(1,1,i_I),psi_non_ref(1,1,k_sd),degree,N_int)
+      if (degree > 2) then
+        cycle
+      endif
+      
+      ! <I| /k\ |alpha>
+      
+      ! |l> = Exc(k -> alpha) |I>
+      call get_excitation(psi_non_ref(1,1,k_sd),tq,exc,degree2,phase,N_int)
+      call decode_exc(exc,degree2,h1,p1,h2,p2,s1,s2)
+
+      tmp_det(1:N_int,1:2) = psi_ref(1:N_int,1:2,i_I)
+
+      call apply_excitation(psi_ref(1,1,i_I), exc, tmp_det, ok, N_int)
+      
+      do i_state=1,N_states
+        dIK(i_state) = dij(i_I, k_sd, i_state)
+      enddo
+      
+      ! <I| \l/ |alpha>
+      do i_state=1,N_states
+        dka(i_state) = 0.d0
+      enddo
+      
+      if (ok) then
+        do l_sd=k_sd+1,N_det_non_ref
+          call get_excitation_degree(tmp_det,psi_non_ref(1,1,l_sd),degree,N_int)
+          if (degree == 0) then
+            call get_excitation(psi_ref(1,1,i_I),psi_non_ref(1,1,l_sd),exc,degree,phase2,N_int)
+            do i_state=1,N_states
+              dka(i_state) = dij(i_I, l_sd, i_state) * phase * phase2
+            enddo
+            exit
+          endif
+        enddo
+        
+      else if (perturbative_triples) then
+        ! Linked
+        
+        call i_h_j(tq,psi_non_ref(1,1,k_sd),N_int,hka)
+        if (dabs(hka) > 1.d-12) then
+          double precision               :: Delta_E(N_states)
+          call get_delta_e_dyall_general_mp(psi_ref(1,1,i_I),tq,Delta_E)
+          
+          do i_state=1,N_states
+            ASSERT (Delta_E(i_state) < 0.d0)
+            dka(i_state) = hka / Delta_E(i_state)
+          enddo
+        endif
+        
+      endif
+      
+      if (perturbative_triples.and. (degree2 == 1) ) then
+        call i_h_j(psi_ref(1,1,i_I),tmp_det,N_int,hka)
+        call i_h_j(tq,psi_non_ref(1,1,k_sd),N_int,hla)
+        hka = hla - hka
+        if (dabs(hka) > 1.d-12) then
+          call get_delta_e_dyall_general_mp(psi_ref(1,1,i_I),tq,Delta_E)
+          do i_state=1,N_states
+            ASSERT (Delta_E(i_state) < 0.d0)
+            dka(i_state) = hka / Delta_E(i_state)
+          enddo
+        endif
+        
+      endif
+      
+      do i_state=1,N_states
+        dIa(i_state) = dIa(i_state) + dIk(i_state) * dka(i_state)
+      enddo
+    enddo
+    
+    do i_state=1,N_states
+      c_alpha(i_state) += dIa(i_state) * psi_ref_coef(i_I,i_state)
+    enddo
+    
+  enddo
+
+end

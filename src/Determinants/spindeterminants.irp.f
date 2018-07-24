@@ -671,7 +671,10 @@ subroutine create_wf_of_psi_bilinear_matrix(truncate)
   do i=1,N_det
     norm(1) += psi_average_norm_contrib_sorted(i)
     if (truncate) then
-      if (norm(1) >= 0.999999d0) then
+      if (norm(1) >= 1.d0) then
+        exit
+      endif
+      if (psi_average_norm_contrib_sorted(i) == 0.d0) then
         exit
       endif
     endif
