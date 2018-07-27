@@ -344,6 +344,7 @@ subroutine pt2_collector(zmq_socket_pull, E, b, tbc, comb, Ncomb, computed, pt2_
         eqt = sqrt(1d0 / (Nabove(tooth)-1.d0) * abs(sum2above(tooth) / Nabove(tooth) - (sumabove(tooth)/Nabove(tooth))**2))
       else
         eqt = 0.d0
+        tooth=comb_teeth
       endif
       call wall_time(time)
       if ( ((dabs(eqt/avg) < relative_error) .or. (dabs(eqt) < absolute_error)) .and. Nabove(tooth) >= 10.d0) then
