@@ -454,6 +454,26 @@ end
 
 
 
+subroutine save_wavefunction_truncated(thr)
+  implicit none
+  double precision, intent(in) :: thr
+  use bitmasks
+  BEGIN_DOC
+  !  Save the wave function into the EZFIO file
+  END_DOC
+  integer :: N_det_save,i
+  N_det_save = N_det
+  do i=1,N_det
+    if (psi_average_norm_contrib_sorted(i) < thr) then
+      N_det_save = i
+      exit
+    endif
+  enddo
+  if (mpi_master) then
+    call save_wavefunction_general(N_det_save,min(N_states,N_det_save),psi_det_sorted,size(psi_coef_sorted,1),psi_coef_sorted)
+  endif
+end
+
 subroutine save_wavefunction
   implicit none
   use bitmasks
