@@ -22,9 +22,9 @@ BEGIN_PROVIDER [ integer(bit_kind), full_ijkl_bitmask, (N_int) ]
   END_DOC
   
   integer                        :: i,j,k
-  full_ijkl_bitmask = 0_bit_kind
+  k=0
   do j=1,N_int
-    k=0
+    full_ijkl_bitmask(j) = 0_bit_kind
     do i=0,bit_kind_size-1
       k=k+1
       if (mo_class(k) /= 'Deleted') then
