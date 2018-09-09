@@ -60,17 +60,20 @@ integer function zmq_get_dvector(zmq_to_qp_run_socket, worker_id, name, x, size_
     rc = f77_zmq_send(zmq_to_qp_run_socket,trim(msg),len(trim(msg)),0)
     if (rc /= len(trim(msg))) then
       zmq_get_dvector = -1
+      print *,  irp_here, 'rc /= len(trim(msg))', rc, len(trim(msg))
       go to 10
     endif
 
     rc = f77_zmq_recv(zmq_to_qp_run_socket,msg,len(msg),0)
     if (msg(1:14) /= 'get_data_reply') then
+      print *,  irp_here, 'msg(1:14) /= get_data_reply', msg(1:14)
       zmq_get_dvector = -1
       go to 10
     endif
 
     rc = f77_zmq_recv(zmq_to_qp_run_socket,x,size_x*8,0)
     if (rc /= size_x*8) then
+      print *,  irp_here, 'rc /= size_x*8', rc, size_x*8
       zmq_get_dvector = -1
       go to 10
     endif
@@ -78,6 +81,10 @@ integer function zmq_get_dvector(zmq_to_qp_run_socket, worker_id, name, x, size_
 
   10 continue
 
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     integer :: ierr
     include 'mpif.h'
@@ -86,11 +93,8 @@ integer function zmq_get_dvector(zmq_to_qp_run_socket, worker_id, name, x, size_
       print *,  irp_here//': Unable to broadcast zmq_get_dvector'
       stop -1
     endif
-    call MPI_BCAST (x, size_x, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      print *,  irp_here//': Unable to broadcast dvector'
-      stop -1
-    endif
+    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+    call broadcast_chunks_double(x, size_x)
   IRP_ENDIF
 
 end
@@ -177,6 +181,10 @@ integer function zmq_get_ivector(zmq_to_qp_run_socket, worker_id, name, x, size_
 
   10 continue
 
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     integer :: ierr
     include 'mpif.h'
@@ -185,11 +193,8 @@ integer function zmq_get_ivector(zmq_to_qp_run_socket, worker_id, name, x, size_
       print *,  irp_here//': Unable to broadcast zmq_get_ivector'
       stop -1
     endif
-    call MPI_BCAST (x, size_x, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-    if (ierr /= MPI_SUCCESS) then
-      print *,  irp_here//': Unable to broadcast ivector'
-      stop -1
-    endif
+    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+    call broadcast_chunks_integer(x, size_x)
   IRP_ENDIF
 
 end

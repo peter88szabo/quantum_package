@@ -13,9 +13,10 @@ program selection_slave
 end
 
 subroutine provide_everything
-  PROVIDE H_apply_buffer_allocated mo_bielec_integrals_in_map psi_det_generators psi_coef_generators psi_det_sorted_bit psi_selectors n_det_generators n_states generators_bitmask zmq_context n_states_diag
+  PROVIDE H_apply_buffer_allocated mo_bielec_integrals_in_map psi_det_generators psi_coef_generators psi_det_sorted_bit psi_selectors n_det_generators n_states generators_bitmask zmq_context N_states_diag
   PROVIDE pt2_e0_denominator mo_tot_num N_int ci_energy mpi_master zmq_state zmq_context
-  PROVIDE psi_det psi_coef
+  PROVIDE psi_det psi_coef threshold_generators threshold_selectors state_average_weight 
+  PROVIDE N_det_selectors pt2_stoch_istate N_det 
 end
 
 subroutine run_wf
@@ -39,8 +40,6 @@ subroutine run_wf
   integer, external              :: zmq_get_psi, zmq_get_N_det_selectors
   integer, external              :: zmq_get_N_states_diag
 
-  call provide_everything
-  
   zmq_context = f77_zmq_ctx_new ()
   states(1) = 'selection'
   states(2) = 'davidson'
@@ -49,6 +48,10 @@ subroutine run_wf
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
 
+  PROVIDE psi_det psi_coef threshold_generators threshold_selectors state_average_weight mpi_master
+  PROVIDE zmq_state N_det_selectors pt2_stoch_istate N_det pt2_e0_denominator
+  PROVIDE N_det_generators N_states N_states_diag
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   do
 
     if (mpi_master) then
@@ -62,6 +65,10 @@ subroutine run_wf
       print *,  trim(zmq_state)
     endif
 
+    IRP_IF MPI_DEBUG
+      print *,  irp_here, mpi_rank
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    IRP_ENDIF
     IRP_IF MPI
       call MPI_BCAST (zmq_state, 128, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
       if (ierr /= MPI_SUCCESS) then

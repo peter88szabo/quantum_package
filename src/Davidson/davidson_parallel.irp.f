@@ -13,7 +13,6 @@ end
 subroutine davidson_slave_tcp(i)
   implicit none
   integer, intent(in)            :: i
-  
   call davidson_run_slave(0,i)
 end
 
@@ -35,6 +34,10 @@ subroutine davidson_run_slave(thread,iproc)
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
 
   integer, external :: connect_to_taskserver 
+
+
+include 'mpif.h'
+integer ierr
 
   if (connect_to_taskserver(zmq_to_qp_run_socket,worker_id,thread) == -1) then 
     call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket) 
@@ -86,11 +89,13 @@ subroutine davidson_slave_work(zmq_to_qp_run_socket, zmq_socket_push, N_st, sze,
   allocate (energy(N_st))
 
   if (zmq_get_dvector(zmq_to_qp_run_socket, worker_id, 'u_t', u_t, size(u_t)) == -1) then
+    print *,  irp_here, ': Unable to get u_t'
     deallocate(u_t,energy)
     return
   endif
 
   if (zmq_get_dvector(zmq_to_qp_run_socket, worker_id, 'energy', energy, size(energy)) == -1) then
+    print *,  irp_here, ': Unable to get energy'
     deallocate(u_t,energy)
     return
   endif
@@ -467,10 +472,13 @@ integer function zmq_get_N_states_diag(zmq_to_qp_run_socket, worker_id)
     if (rc /= 4) go to 10
   endif 
 
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer :: ierr
-
     call MPI_BCAST (zmq_get_N_states_diag, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
     if (ierr /= MPI_SUCCESS) then
       print *,  irp_here//': Unable to broadcast N_states'
@@ -484,6 +492,7 @@ integer function zmq_get_N_states_diag(zmq_to_qp_run_socket, worker_id)
       endif
     endif
   IRP_ENDIF
+  TOUCH N_states_diag
 
   return
 

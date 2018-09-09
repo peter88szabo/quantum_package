@@ -17,6 +17,10 @@ BEGIN_PROVIDER [ integer, n_states_diag  ]
     endif
     n_states_diag = max(N_states, N_states_diag)
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer :: ierr

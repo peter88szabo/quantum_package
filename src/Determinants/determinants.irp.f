@@ -45,6 +45,10 @@ BEGIN_PROVIDER [ integer, N_det ]
     endif
     call write_int(6,N_det,'Number of determinants')
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -89,6 +93,10 @@ BEGIN_PROVIDER [ integer, psi_det_size ]
     psi_det_size = max(psi_det_size,100000)
     call write_int(6,psi_det_size,'Dimension of the psi arrays')
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -154,6 +162,10 @@ BEGIN_PROVIDER [ integer(bit_kind), psi_det, (N_int,2,psi_det_size) ]
       enddo
     endif
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -212,6 +224,10 @@ BEGIN_PROVIDER [ double precision, psi_coef, (psi_det_size,N_states) ]
       endif
     endif
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
