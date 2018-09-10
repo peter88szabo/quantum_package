@@ -51,7 +51,9 @@ subroutine run_wf
   PROVIDE psi_det psi_coef threshold_generators threshold_selectors state_average_weight mpi_master
   PROVIDE zmq_state N_det_selectors pt2_stoch_istate N_det pt2_e0_denominator
   PROVIDE N_det_generators N_states N_states_diag
-  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_IF MPI
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   do
 
     if (mpi_master) then

@@ -409,9 +409,11 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   allocate(banned(mo_tot_num, mo_tot_num,2), bannedOrb(mo_tot_num, 2))
   allocate (mat(N_states, mo_tot_num, mo_tot_num))
   maskInd = -1
-  integer :: nb_count
+  integer :: nb_count, maskInd_save
+  logical :: found
   do s1=1,2
     do i1=N_holes(s1),1,-1   ! Generate low excitations first
+
       h1 = hole_list(i1,s1)
       call apply_hole(psi_det_generators(1,1,i_generator), s1,h1, pmask, ok, N_int)
       
