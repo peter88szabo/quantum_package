@@ -6,7 +6,6 @@ BEGIN_PROVIDER [ integer, pt2_stoch_istate ]
  pt2_stoch_istate = 1
 END_PROVIDER
 
-
  BEGIN_PROVIDER [ integer, pt2_N_teeth ]
 &BEGIN_PROVIDER [ integer, pt2_minDetInFirstTeeth ]
 &BEGIN_PROVIDER [ integer, pt2_n_tasks_max ]
@@ -14,11 +13,14 @@ END_PROVIDER
   implicit none
   logical, external :: testTeethBuilding
   integer :: i
-  pt2_F(:) = 1
-  pt2_n_tasks_max = N_det_generators/100 + 1
+  integer :: e
+  e = elec_num - n_core_orb * 2
+  pt2_n_tasks_max = min(1+(e*(e-1))/2, int(dsqrt(dble(N_det_generators))))
   do i=1,N_det_generators
-    if (maxval(dabs(psi_coef_sorted_gen(i,:))) > 0.005d0) then
-      pt2_F(i) = max(1,min( ((elec_alpha_num-n_core_orb)**2)/4, pt2_n_tasks_max))
+    if (maxval(dabs(psi_coef_sorted_gen(i,1:N_states))) > 0.0001d0) then
+      pt2_F(i) = pt2_n_tasks_max
+    else
+      pt2_F(i) = 1
     endif
   enddo
   
