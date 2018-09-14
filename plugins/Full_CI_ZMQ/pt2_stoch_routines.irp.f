@@ -160,8 +160,7 @@ subroutine ZMQ_pt2(E, pt2,relative_error, error)
 
 
       integer, external :: add_task_to_taskserver
-      character(len=:), allocatable           :: task
-      allocate(character(len=100000) :: task)
+      character(100000) :: task
 
       integer :: j,k,ipos
 

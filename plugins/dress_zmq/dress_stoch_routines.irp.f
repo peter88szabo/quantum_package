@@ -232,7 +232,6 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
   
   implicit none
   
-  character(len=:), allocatable        :: task
   integer(ZMQ_PTR)               :: zmq_to_qp_run_socket, zmq_socket_pull
   integer, external              :: omp_get_thread_num
   double precision, intent(in)   :: E(N_states), relative_error
@@ -246,7 +245,7 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
   integer                        :: i, j, k, Ncp
   
   double precision               :: state_average_weight_save(N_states)
-  allocate(character(len=100000) :: task)
+  character(100000)              :: task
   PROVIDE Nproc
   task(:) = CHAR(0)
   allocate(delta(N_states,N_det), delta_s2(N_states, N_det))
