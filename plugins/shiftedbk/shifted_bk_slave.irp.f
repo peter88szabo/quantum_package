@@ -117,28 +117,20 @@ subroutine run_w
 
       call wall_time(t0)
       if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle
-      print *,  'if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle', mpi_rank
 
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
-      print *,  'if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle', mpi_rank
 
       if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle
-      print *,  'if (zmq_get_N_det_selectors(zmq_to_qp_run_socket, 1) == -1) cycle', mpi_rank
 
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) cycle
-      print *,  'if (zmq_get_dvector(zmq_to_qp_run_socket,1,threshold_generators,threshold_generators,1) == -1) cycle', mpi_rank
 
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) cycle
-      print *,  'if (zmq_get_dvector(zmq_to_qp_run_socket,1,threshold_selectors,threshold_selectors,1) == -1) cycle', mpi_rank
 
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'energy',energy,N_states) == -1) cycle
-      print *,  'if (zmq_get_dvector(zmq_to_qp_run_socket,1,energy,energy,N_states) == -1) cycle', mpi_rank
 
       if (zmq_get_int(zmq_to_qp_run_socket,1,'dress_stoch_istate',dress_stoch_istate) == -1) cycle
-      print *,  'if (zmq_get_int(zmq_to_qp_run_socket,1,dress_stoch_istate,dress_stoch_istate) == -1) cycle', mpi_rank
 
       if (zmq_get_dvector(zmq_to_qp_run_socket,1,'state_average_weight',state_average_weight,N_states) == -1) cycle
-      print *,  'if (zmq_get_dvector(zmq_to_qp_run_socket,1,state_average_weight,state_average_weight,N_states) == -1) cycle', mpi_rank
 
       psi_energy(1:N_states) = energy(1:N_states)
       TOUCH psi_energy state_average_weight dress_stoch_istate threshold_selectors threshold_generators
