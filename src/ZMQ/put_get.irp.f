@@ -8,7 +8,7 @@ integer function zmq_put_dvector(zmq_to_qp_run_socket, worker_id, name, x, size_
   integer, intent(in)            :: worker_id
   character*(*)                  :: name
   integer, intent(in)            :: size_x
-  double precision, intent(out)  :: x(size_x)
+  double precision, intent(in)   :: x(size_x)
   integer                        :: rc
   character*(256)                :: msg
 
@@ -111,7 +111,7 @@ integer function zmq_put_ivector(zmq_to_qp_run_socket, worker_id, name, x, size_
   integer, intent(in)            :: worker_id
   character*(*)                  :: name
   integer, intent(in)            :: size_x
-  integer, intent(out)           :: x(size_x)
+  integer, intent(in)            :: x(size_x)
   integer                        :: rc
   character*(256)                :: msg
 
@@ -200,4 +200,82 @@ integer function zmq_get_ivector(zmq_to_qp_run_socket, worker_id, name, x, size_
 end
 
 
+
+integer function zmq_put_int(zmq_to_qp_run_socket, worker_id, name, x)
+  use f77_zmq
+  implicit none
+  BEGIN_DOC
+! Put a vector of integers on the qp_run scheduler
+  END_DOC
+  integer(ZMQ_PTR), intent(in)   :: zmq_to_qp_run_socket
+  integer, intent(in)            :: worker_id
+  character*(*)                  :: name
+  integer, intent(in)            :: x
+  integer                        :: rc
+  character*(256)                :: msg
+
+  zmq_put_int = 0
+
+  write(msg,'(A,1X,I8,1X,A200)') 'put_data '//trim(zmq_state), worker_id, name
+  rc = f77_zmq_send(zmq_to_qp_run_socket,trim(msg),len(trim(msg)),ZMQ_SNDMORE)
+  if (rc /= len(trim(msg))) then
+    zmq_put_int = -1
+    return 
+  endif
+
+  rc = f77_zmq_send(zmq_to_qp_run_socket,x,4,0)
+  if (rc /= 4) then
+    zmq_put_int = -1
+    return
+  endif
+
+  rc = f77_zmq_recv(zmq_to_qp_run_socket,msg,len(msg),0)
+  if (msg(1:rc) /= 'put_data_reply ok') then
+    zmq_put_int = -1
+    return
+  endif
+
+end
+
+integer function zmq_get_int(zmq_to_qp_run_socket, worker_id, name, x)
+  use f77_zmq
+  implicit none
+  BEGIN_DOC
+! Get a vector of integers from the qp_run scheduler
+  END_DOC
+  integer(ZMQ_PTR), intent(in)   :: zmq_to_qp_run_socket
+  integer, intent(in)            :: worker_id
+  character*(*), intent(in)      :: name
+  integer, intent(out)           :: x
+  integer                        :: rc
+  character*(256)                :: msg
+
+  PROVIDE zmq_state
+  ! Success
+  zmq_get_int = 0
+
+  if (mpi_master) then
+    write(msg,'(A,1X,I8,1X,A200)') 'get_data '//trim(zmq_state), worker_id, name
+    rc = f77_zmq_send(zmq_to_qp_run_socket,trim(msg),len(trim(msg)),0)
+    if (rc /= len(trim(msg))) then
+      zmq_get_int = -1
+      go to 10
+    endif
+
+    rc = f77_zmq_recv(zmq_to_qp_run_socket,msg,len(msg),0)
+    if (msg(1:14) /= 'get_data_reply') then
+      zmq_get_int = -1
+      go to 10
+    endif
+
+    rc = f77_zmq_recv(zmq_to_qp_run_socket,x,4,0)
+    if (rc /= 4) then
+      zmq_get_int = -1
+      go to 10
+    endif
+  endif
+
+  10 continue
+
+end
 

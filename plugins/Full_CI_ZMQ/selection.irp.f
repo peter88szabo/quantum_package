@@ -357,6 +357,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
       endif
     enddo
   enddo
+
   deallocate(exc_degree)
   nmax=k-1
 
@@ -404,15 +405,35 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   end do
   deallocate(indices)
   
-
   allocate(minilist(N_int, 2, N_det_selectors), fullminilist(N_int, 2, N_det))
   allocate(banned(mo_tot_num, mo_tot_num,2), bannedOrb(mo_tot_num, 2))
   allocate (mat(N_states, mo_tot_num, mo_tot_num))
   maskInd = -1
-  integer :: nb_count, maskInd_save
+
+  integer :: nb_count, maskInd_save, monoBdo_save
   logical :: found
+
   do s1=1,2
     do i1=N_holes(s1),1,-1   ! Generate low excitations first
+
+      monoBdo_save = monoBdo
+      maskInd_save = maskInd
+      do s2=s1,2
+        ib = 1
+        if(s1 == s2) ib = i1+1
+        do i2=N_holes(s2),ib,-1
+          maskInd += 1
+          if(mod(maskInd, csubset) == (subset-1)) then  
+            found = .True.
+          end if
+        enddo
+        if(s1 /= s2) monoBdo = .false.
+      enddo
+
+      if (.not.found) cycle
+      monoBdo = monoBdo_save
+      maskInd = maskInd_save
+
 
       h1 = hole_list(i1,s1)
       call apply_hole(psi_det_generators(1,1,i_generator), s1,h1, pmask, ok, N_int)
@@ -526,8 +547,6 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
           enddo
         end if
       end do
-      
-
 
       do s2=s1,2
         sp = s1

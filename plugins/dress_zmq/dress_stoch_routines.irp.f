@@ -13,20 +13,24 @@ END_PROVIDER
   implicit none
   logical, external :: testTeethBuilding
   integer :: i
-  pt2_F(:) = 1
-  pt2_n_tasks_max = 20
-!  do i=1,N_det_generators
-!    if (maxval(dabs(psi_coef_sorted_gen(i,:))) > 0.001d0) then
-!      pt2_F(i) = max(1,min( (elec_alpha_num-n_core_orb)**2, pt2_n_tasks_max))
-!    endif
-!  enddo
+  integer :: e
+  e = elec_num - n_core_orb * 2
+  pt2_n_tasks_max = 1 + min((e*(e-1))/2, int(dsqrt(dble(N_det_generators)))/10)
+  do i=1,N_det_generators
+    if (maxval(dabs(psi_coef_sorted_gen(i,1:N_states))) > 0.001d0) then
+      pt2_F(i) = pt2_n_tasks_max
+    else
+      pt2_F(i) = 1
+    endif
+  enddo
+
   
   if(N_det_generators < 1024) then
     pt2_minDetInFirstTeeth = 1
     pt2_N_teeth = 1
   else
     pt2_minDetInFirstTeeth = min(5, N_det_generators)
-    do pt2_N_teeth=100,2,-1
+    do pt2_N_teeth=20,2,-1
       if(testTeethBuilding(pt2_minDetInFirstTeeth, pt2_N_teeth)) exit
     end do
   end if
@@ -219,7 +223,7 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
   
   implicit none
   
-  character(len=64000)           :: task
+  character(len=64000000)        :: task
   integer(ZMQ_PTR)               :: zmq_to_qp_run_socket, zmq_socket_pull
   integer, external              :: omp_get_thread_num
   double precision, intent(in)   :: E(N_states), relative_error
@@ -232,8 +236,8 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
   
   integer                        :: i, j, k, Ncp
   
-  integer, external              :: add_task_to_taskserver
   double precision               :: state_average_weight_save(N_states)
+  PROVIDE Nproc
   task(:) = CHAR(0)
   allocate(delta(N_states,N_det), delta_s2(N_states, N_det))
   state_average_weight_save(:) = state_average_weight(:)
@@ -254,7 +258,7 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
     integer, external              :: zmq_put_N_det_generators
     integer, external              :: zmq_put_N_det_selectors
     integer, external              :: zmq_put_dvector
-    integer, external              :: zmq_set_running
+    integer, external              :: zmq_put_int
 
     if (zmq_put_psi(zmq_to_qp_run_socket,1) == -1) then
       stop 'Unable to put psi on ZMQ server'
@@ -271,25 +275,59 @@ subroutine ZMQ_dress(E, dress, delta_out, delta_s2_out, relative_error)
     if (zmq_put_dvector(zmq_to_qp_run_socket,1,"state_average_weight",state_average_weight,N_states) == -1) then
       stop 'Unable to put state_average_weight on ZMQ server'
     endif
-    if (zmq_put_dvector(zmq_to_qp_run_socket,1,"dress_stoch_istate",real(dress_stoch_istate,8),1) == -1) then
+    if (zmq_put_int(zmq_to_qp_run_socket,1,"dress_stoch_istate",dress_stoch_istate) == -1) then
       stop 'Unable to put dress_stoch_istate on ZMQ server'
     endif
+      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_selectors',threshold_selectors,1) == -1) then
+        stop 'Unable to put threshold_selectors on ZMQ server'
+      endif
+      if (zmq_put_dvector(zmq_to_qp_run_socket,1,'threshold_generators',threshold_generators,1) == -1) then
+        stop 'Unable to put threshold_generators on ZMQ server'
+      endif
 
 
-    integer(ZMQ_PTR), external     :: new_zmq_to_qp_run_socket
+
+      call write_int(6,pt2_n_tasks_max,'Max number of task fragments')
 
 
-    do i=1,N_det_generators
-      do j=1,pt2_F(pt2_J(i))
-        write(task(1:20),'(I9,1X,I9''|'')') j, pt2_J(i)
-        if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:20))) == -1) then
+      integer, external :: add_task_to_taskserver
+      integer :: ipos
+      ipos=0
+      do i=1,N_det_generators
+        if (pt2_F(i) > 1) then
+          ipos += 1
+        endif
+      enddo
+      call write_int(6,ipos,'Number of fragmented tasks')
+
+
+      ipos=1
+      task = ' '
+
+      do i= 1, N_det_generators
+        do j=1,pt2_F(pt2_J(i))
+          write(task(ipos:ipos+20),'(I9,1X,I9,''|'')') j, pt2_J(i)
+          ipos += 20
+          if (ipos > len(task)-20) then
+            if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
+              stop 'Unable to add task to task server'
+            endif
+            ipos=1
+          endif
+        end do
+      enddo
+      if (ipos > 1) then
+        if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
           stop 'Unable to add task to task server'
         endif
-      end do
-    end do
-    if (zmq_set_running(zmq_to_qp_run_socket) == -1) then
-      print *,  irp_here, ': Failed in zmq_set_running'
-    endif
+      endif
+
+      integer, external :: zmq_set_running
+      if (zmq_set_running(zmq_to_qp_run_socket) == -1) then
+        print *,  irp_here, ': Failed in zmq_set_running'
+      endif
+
+
     
     integer :: nproc_target
     nproc_target = nproc
@@ -495,14 +533,14 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
       m += 1
       if(dabs(error / avg) <= relative_error) then
         integer, external :: zmq_put_dvector
-        i= zmq_put_dvector(zmq_to_qp_run_socket, worker_id, "ending", dble(m-1), 1)
+        integer, external :: zmq_put_int
+        i= zmq_put_int(zmq_to_qp_run_socket, worker_id, "ending", (m-1))
         found = .true.
       end if
     else
       do
         call  pull_dress_results(zmq_socket_pull, m_task, f, edI_task, edI_index, breve_delta_m, task_id, n_tasks)
         if(time0 == -1d0) then
-          print *, "first pull", omp_get_wtime()-time
           time0 = omp_get_wtime()
         end if
         if(m_task == 0) then
@@ -516,14 +554,13 @@ subroutine dress_collector(zmq_socket_pull, E, relative_error, delta, delta_s2, 
         end if
       end do
       do i=1,n_tasks
-        if(edI(edI_index(i)) /= 0d0) stop "NIN M"
         edI(edI_index(i)) += edI_task(i) 
       end do
       dot_f(m_task) -= f
     end if
   end do
   if (zmq_abort(zmq_to_qp_run_socket) == -1) then
-    call sleep(1)
+    call sleep(10)
     if (zmq_abort(zmq_to_qp_run_socket) == -1) then
       print *, irp_here, ': Error in sending abort signal (2)'
     endif
