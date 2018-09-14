@@ -15,9 +15,9 @@ END_PROVIDER
   integer :: i
   integer :: e
   e = elec_num - n_core_orb * 2
-  pt2_n_tasks_max = min(1+(e*(e-1))/2, int(dsqrt(dble(N_det_generators))))
+  pt2_n_tasks_max = 1+min((e*(e-1))/2, int(dsqrt(dble(N_det_generators)))/10)
   do i=1,N_det_generators
-    if (maxval(dabs(psi_coef_sorted_gen(i,1:N_states))) > 0.0001d0) then
+    if (maxval(dabs(psi_coef_sorted_gen(i,1:N_states))) > 0.001d0) then
       pt2_F(i) = pt2_n_tasks_max
     else
       pt2_F(i) = 1
@@ -158,17 +158,28 @@ subroutine ZMQ_pt2(E, pt2,relative_error, error)
       endif
 
 
+
       integer, external :: add_task_to_taskserver
-      character(len=64000)           :: task
+      character(len=:), allocatable           :: task
+      allocate(character(len=100000) :: task)
+
       integer :: j,k,ipos
+
+      ipos=0
+      do i=1,N_det_generators
+        if (pt2_F(i) > 1) then
+          ipos += 1
+        endif
+      enddo
+      call write_int(6,ipos,'Number of fragmented tasks')
+
       ipos=1
-      task = ' ' 
 
       do i= 1, N_det_generators
         do j=1,pt2_F(pt2_J(i))
           write(task(ipos:ipos+20),'(I9,1X,I9,''|'')') j, pt2_J(i)
           ipos += 20
-          if (ipos > 63980) then
+          if (ipos > len(task)-20) then
             if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
               stop 'Unable to add task to task server'
             endif
@@ -328,7 +339,7 @@ subroutine pt2_collector(zmq_socket_pull, E, relative_error, pt2, error)
             print '(G10.3, 2X, F16.10, 2X, G16.3, 2X, F16.4, A20)', c, avg+E, eqt, time-time0, ''
             if( dabs(error(pt2_stoch_istate) / pt2(pt2_stoch_istate)) < relative_error) then
               if (zmq_abort(zmq_to_qp_run_socket) == -1) then
-                call sleep(1)
+                call sleep(10)
                 if (zmq_abort(zmq_to_qp_run_socket) == -1) then
                   print *, irp_here, ': Error in sending abort signal (2)'
                 endif
@@ -402,7 +413,16 @@ end function
       d(i) = .true.
       pt2_J(i) = i
   end do
-  call random_seed(put=(/3211,64,6566,321,65,321,654,65,321,6321,654,65,321,621,654,65,321,65,654,65,321,65/)) 
+
+  integer, allocatable :: seed(:)
+  call random_seed(size=m)
+  allocate(seed(m))
+  do i=1,m
+    seed(i) = i
+  enddo
+  call random_seed(put=seed)
+  deallocate(seed)
+
   call RANDOM_NUMBER(pt2_u)
   call RANDOM_NUMBER(pt2_u)
   

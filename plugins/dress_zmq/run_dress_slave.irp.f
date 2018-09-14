@@ -33,15 +33,14 @@ subroutine run_dress_slave(thread,iproce,energy)
   integer :: cp_max(Nproc)
   integer :: will_send, task_id, purge_task_id, ntask_buf
   integer, allocatable :: task_buf(:)
-  integer(kind=OMP_LOCK_KIND) :: lck_det(0:pt2_N_teeth+1)
-  integer(kind=OMP_LOCK_KIND) :: lck_sto(0:dress_N_cp+1), sending, getting_task
+!  integer(kind=OMP_LOCK_KIND) :: lck_det(0:pt2_N_teeth+1)
+!  integer(kind=OMP_LOCK_KIND) :: lck_sto(dress_N_cp)
   double precision :: fac
-  double precision :: ending(1)
-  integer, external :: zmq_get_dvector
+  integer :: ending
+  integer, external :: zmq_get_dvector, zmq_get_int
 ! double precision, external :: omp_get_wtime
   double precision :: time, time0
   integer :: ntask_tbd, task_tbd(Nproc), i_gen_tbd(Nproc), subset_tbd(Nproc)
-!  if(iproce /= 0) stop "RUN DRESS SLAVE is OMP"
   
   allocate(delta_det(N_states, N_det, 0:pt2_N_teeth+1, 2))
   allocate(cp(N_states, N_det, dress_N_cp, 2))
@@ -53,14 +52,12 @@ subroutine run_dress_slave(thread,iproce,energy)
   cp = 0d0
   task = CHAR(0)
   
-  call omp_init_lock(sending)
-  call omp_init_lock(getting_task)
-  do i=0,dress_N_cp+1
-    call omp_init_lock(lck_sto(i))
-  end do
-  do i=0,pt2_N_teeth+1
-    call omp_init_lock(lck_det(i))
-  end do 
+!  do i=1,dress_N_cp
+!    call omp_init_lock(lck_sto(i))
+!  end do
+!  do i=0,pt2_N_teeth+1
+!    call omp_init_lock(lck_det(i))
+!  end do 
   
   cp_done = 0
   cp_sent = 0
@@ -69,7 +66,7 @@ subroutine run_dress_slave(thread,iproce,energy)
   double precision :: hij, sij, tmp
   purge_task_id = 0
   provide psi_energy
-  ending(1) = dble(dress_N_cp+1)
+  ending = dress_N_cp+1
   ntask_tbd = 0
   !$OMP PARALLEL DEFAULT(SHARED) &
   !$OMP PRIVATE(breve_delta_m, task_id) &
@@ -86,7 +83,7 @@ subroutine run_dress_slave(thread,iproce,energy)
     stop "WORKER -1"
   end if
   iproc = omp_get_thread_num()+1
-    allocate(breve_delta_m(N_states,N_det,2))
+  allocate(breve_delta_m(N_states,N_det,2))
   allocate(task_buf(pt2_n_tasks_max))
   ntask_buf = 0
   
@@ -94,8 +91,9 @@ subroutine run_dress_slave(thread,iproce,energy)
     call push_dress_results(zmq_socket_push, 0, 0, edI_task, edI_index, breve_delta_m, task_buf, ntask_buf)
   end if
 
+  cp_max(:) = 0
   do while(cp_done > cp_sent .or. m /= dress_N_cp+1)
-    call omp_set_lock(getting_task)
+    !$OMP CRITICAL (send)
     if(ntask_tbd == 0) then
       ntask_tbd = size(task_tbd)
       call get_tasks_from_taskserver(zmq_to_qp_run_socket,worker_id, task_tbd, task, ntask_tbd)
@@ -113,13 +111,13 @@ subroutine run_dress_slave(thread,iproce,energy)
       ntask_tbd -= 1
     else
       m = dress_N_cp + 1
-      i= zmq_get_dvector(zmq_to_qp_run_socket, worker_id, "ending", ending, 1)
+      i= zmq_get_int(zmq_to_qp_run_socket, worker_id, "ending", ending)
     end if
-    call omp_unset_lock(getting_task)
     will_send = 0
     
-    !$OMP CRITICAL
     cp_max(iproc) = m
+!    print *,  cp_max(:)
+!    print *,  ''
     cp_done = minval(cp_max)-1
     if(cp_done > cp_sent) then
       will_send = cp_sent + 1
@@ -132,10 +130,8 @@ subroutine run_dress_slave(thread,iproce,energy)
       ntask_buf += 1
       task_buf(ntask_buf) = task_id
     end if
-    !$OMP END CRITICAL
     
-    if(will_send /= 0 .and. will_send <= int(ending(1))) then
-      call omp_set_lock(sending)
+    if(will_send /= 0 .and. will_send <= ending) then
       n_tasks = 0
       sum_f = 0
       do i=1,N_det_generators
@@ -146,9 +142,10 @@ subroutine run_dress_slave(thread,iproce,energy)
           edI_index(n_tasks) = i
         end if
       end do
-      call push_dress_results(zmq_socket_push, will_send, sum_f, edI_task, edI_index, breve_delta_m, 0, n_tasks)
-      call omp_unset_lock(sending)
+      call push_dress_results(zmq_socket_push, will_send, sum_f, edI_task, edI_index, &
+        breve_delta_m, 0, n_tasks)
     end if
+    !$OMP END CRITICAL (send)
     
     if(m /= dress_N_cp+1) then    
       !UPDATE i_generator
@@ -158,29 +155,29 @@ subroutine run_dress_slave(thread,iproce,energy)
       time0 = omp_get_wtime()
       call alpha_callback(breve_delta_m, i_generator, subset, pt2_F(i_generator), iproc)
       time = omp_get_wtime()
-      !print '(I0.11, I4, A12, F12.3)', i_generator, subset, "GREPMETIME", time-time0
+!print '(I0.11, I4, A12, F12.3)', i_generator, subset, "GREPMETIME", time-time0
       t = dress_T(i_generator)
     
-      call omp_set_lock(lck_det(t))
+      !$OMP CRITICAL(t_crit)
       do j=1,N_det
         do i=1,N_states
           delta_det(i,j,t, 1) = delta_det(i,j,t, 1) + breve_delta_m(i,j,1)
           delta_det(i,j,t, 2) = delta_det(i,j,t, 2) + breve_delta_m(i,j,2)
          enddo
       enddo
-      call omp_unset_lock(lck_det(t))
+      !$OMP END CRITICAL(t_crit)
     
       do p=1,dress_N_cp
         if(dress_e(i_generator, p) /= 0d0) then
           fac = dress_e(i_generator, p)
-          call omp_set_lock(lck_sto(p))
+          !$OMP CRITICAL(p_crit)
           do j=1,N_det
             do i=1,N_states
               cp(i,j,p,1) = cp(i,j,p,1) + breve_delta_m(i,j,1) * fac
               cp(i,j,p,2) = cp(i,j,p,2) + breve_delta_m(i,j,2) * fac
             enddo
           enddo
-          call omp_unset_lock(lck_sto(p))
+          !$OMP END CRITICAL(p_crit)
         end if
       end do
       
@@ -198,7 +195,9 @@ subroutine run_dress_slave(thread,iproce,energy)
         ntask_buf = 0
       end if
     end if
+    !$OMP FLUSH
   end do
+
   !$OMP BARRIER
    if(ntask_buf /= 0) then
      call push_dress_results(zmq_socket_push, 0, 0, edI_task, edI_index, breve_delta_m, task_buf, ntask_buf)
@@ -206,12 +205,12 @@ subroutine run_dress_slave(thread,iproce,energy)
    end if
     !$OMP SINGLE
     if(purge_task_id /= 0) then
-      do while(int(ending(1)) == dress_N_cp+1)
+      do while(ending == dress_N_cp+1)
         call sleep(1)
-        i= zmq_get_dvector(zmq_to_qp_run_socket, worker_id, "ending", ending, 1)
+        i= zmq_get_int(zmq_to_qp_run_socket, worker_id, "ending", ending)
       end do
 
-      will_send = int(ending(1))
+      will_send = ending
       breve_delta_m = 0d0
       
       do l=will_send, 1,-1
@@ -238,12 +237,12 @@ subroutine run_dress_slave(thread,iproce,energy)
   call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket)
   call end_zmq_push_socket(zmq_socket_push,thread)
   !$OMP END PARALLEL
-  do i=0,dress_N_cp+1
-    call omp_destroy_lock(lck_sto(i))
-  end do
-  do i=0,pt2_N_teeth+1
-    call omp_destroy_lock(lck_det(i))
-  end do
+!  do i=0,dress_N_cp+1
+!    call omp_destroy_lock(lck_sto(i))
+!  end do
+!  do i=0,pt2_N_teeth+1
+!    call omp_destroy_lock(lck_det(i))
+!  end do
 end subroutine
 
 

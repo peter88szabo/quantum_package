@@ -36,8 +36,6 @@ subroutine davidson_run_slave(thread,iproc)
   integer, external :: connect_to_taskserver 
 
 
-include 'mpif.h'
-integer ierr
 
   if (connect_to_taskserver(zmq_to_qp_run_socket,worker_id,thread) == -1) then 
     call end_zmq_to_qp_run_socket(zmq_to_qp_run_socket) 
