@@ -39,7 +39,7 @@ subroutine routine
   enddo
  enddo
 
- call save_wavefunction_general(ndet_max,N_states,psi_det_tmp,N_det_max,psi_coef_tmp)
+ call save_wavefunction_general(ndet_max,N_states,psi_det_tmp,size(psi_coef_tmp,1),psi_coef_tmp)
  
 end
 
@@ -86,6 +86,6 @@ subroutine routine_s2
   enddo
  enddo
 
- call save_wavefunction_general(ndet_max,N_states,psi_det_tmp,N_det_max,psi_coef_tmp)
+ call save_wavefunction_general(ndet_max,N_states,psi_det_tmp,size(psi_coef_tmp,1),psi_coef_tmp)
  
 end

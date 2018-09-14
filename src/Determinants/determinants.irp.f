@@ -549,23 +549,18 @@ subroutine save_wavefunction_general(ndet,nstates,psidet,dim_psicoef,psicoef)
     deallocate (psi_det_save)
     
     allocate (psi_coef_save(ndet,nstates))
-    double precision               :: accu_norm(nstates)
-    accu_norm = 0.d0
+    double precision               :: accu_norm
     do k=1,nstates
+      accu_norm = 0.d0
       do i=1,ndet
-        accu_norm(k) = accu_norm(k) + psicoef(i,k) * psicoef(i,k)
-        psi_coef_save(i,k) = psicoef(i,k)
+        accu_norm = accu_norm + psicoef(i,k) * psicoef(i,k)
       enddo
-      if (accu_norm(k) == 0.d0) then
-        accu_norm(k) = 1.e-12
+      if (accu_norm == 0.d0) then
+        accu_norm = 1.e-12
       endif
-    enddo
-    do k = 1, nstates
-      accu_norm(k) = 1.d0/dsqrt(accu_norm(k))
-    enddo
-    do k=1,nstates
+      accu_norm = 1.d0/dsqrt(accu_norm)
       do i=1,ndet
-        psi_coef_save(i,k) = psi_coef_save(i,k) * accu_norm(k)
+        psi_coef_save(i,k) = psicoef(i,k) * accu_norm
       enddo
     enddo
     

@@ -256,6 +256,8 @@ BEGIN_PROVIDER [ integer, det_to_occ_pattern, (N_det) ]
  integer :: i,j,k
  integer(bit_kind) :: occ(N_int,2)
  logical :: found
+ !$OMP PARALLEL DO DEFAULT(SHARED) &
+ !$OMP PRIVATE(i,k,j,found,occ)
  do i=1,N_det
     do k = 1, N_int
       occ(k,1) = ieor(psi_det(k,1,i),psi_det(k,2,i))
@@ -276,6 +278,7 @@ BEGIN_PROVIDER [ integer, det_to_occ_pattern, (N_det) ]
       endif
     enddo
  enddo
+ !$OMP END PARALLEL DO
 END_PROVIDER
 
 BEGIN_PROVIDER [ double precision, weight_occ_pattern, (N_occ_pattern,N_states) ]
