@@ -414,6 +414,7 @@ end function
       pt2_J(i) = i
   end do
 
+  integer :: m
   integer, allocatable :: seed(:)
   call random_seed(size=m)
   allocate(seed(m))

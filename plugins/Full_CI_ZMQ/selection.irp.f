@@ -412,10 +412,10 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
 
   integer :: nb_count, maskInd_save, monoBdo_save
   logical :: found
-
   do s1=1,2
     do i1=N_holes(s1),1,-1   ! Generate low excitations first
 
+      found = .False.
       monoBdo_save = monoBdo
       maskInd_save = maskInd
       do s2=s1,2

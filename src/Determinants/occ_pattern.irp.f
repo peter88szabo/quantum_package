@@ -248,6 +248,52 @@ end
 
 END_PROVIDER 
 
+BEGIN_PROVIDER [ integer, det_to_occ_pattern, (N_det) ]
+ implicit none
+ BEGIN_DOC
+ ! Returns the index of the occupation pattern for each determinant
+ END_DOC
+ integer :: i,j,k
+ integer(bit_kind) :: occ(N_int,2)
+ logical :: found
+ do i=1,N_det
+    do k = 1, N_int
+      occ(k,1) = ieor(psi_det(k,1,i),psi_det(k,2,i))
+      occ(k,2) = iand(psi_det(k,1,i),psi_det(k,2,i))
+    enddo
+    do j=1,N_occ_pattern
+      found = .True.
+      do k=1,N_int
+        if ( (occ(k,1) /= psi_occ_pattern(k,1,j)) &
+        .or. (occ(k,2) /= psi_occ_pattern(k,2,j)) ) then
+          found = .False.
+          exit
+        endif
+      enddo
+      if (found) then
+        det_to_occ_pattern(i) = j
+        exit
+      endif
+    enddo
+ enddo
+END_PROVIDER
+
+BEGIN_PROVIDER [ double precision, weight_occ_pattern, (N_occ_pattern,N_states) ]
+ implicit none
+ BEGIN_DOC
+ ! Weight of the occupation patterns in the wave function
+ END_DOC
+ integer :: i,j,k
+ weight_occ_pattern = 0.d0
+ do i=1,N_det
+  j = det_to_occ_pattern(i)
+  do k=1,N_states
+    weight_occ_pattern(j,k) += psi_coef(i,k) * psi_coef(i,k)
+  enddo
+ enddo
+END_PROVIDER
+
+
 subroutine make_s2_eigenfunction
   implicit none
   integer                        :: i,j,k
