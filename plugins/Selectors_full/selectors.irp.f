@@ -13,8 +13,7 @@ BEGIN_PROVIDER [ integer, N_det_selectors]
   norm = 1.d0
   do i=1,N_det
     norm = norm - psi_average_norm_contrib_sorted(i)
-    if (psi_average_norm_contrib_sorted(i) == 0.d0) exit
-    if (norm < 1.d0 - threshold_selectors) then
+    if (norm - 1.d-12 < 1.d0 - threshold_selectors) then
       N_det_selectors = i
       exit
     endif

@@ -49,7 +49,7 @@ logical function testTeethBuilding(minF, N)
   allocate(tilde_w(N_det_generators), tilde_cW(0:N_det_generators))
   
   do i=1,N_det_generators
-    tilde_w(i)  = psi_coef_sorted_gen(i,pt2_stoch_istate)**2 + 1.d-20
+    tilde_w(i)  = psi_coef_sorted_gen(i,pt2_stoch_istate)**2 !+ 1.d-20
   enddo
 
   double precision :: norm
@@ -479,7 +479,7 @@ END_PROVIDER
   tilde_cW(0) = 0d0
   
   do i=1,N_det_generators
-    tilde_w(i)  = psi_coef_sorted_gen(i,pt2_stoch_istate)**2 + 1.d-20
+    tilde_w(i)  = psi_coef_sorted_gen(i,pt2_stoch_istate)**2 !+ 1.d-20
   enddo
 
   double precision :: norm
