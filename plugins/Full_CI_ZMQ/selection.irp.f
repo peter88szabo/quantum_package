@@ -308,7 +308,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   call bitstring_to_list_ab(hole    , hole_list    , N_holes    , N_int)
   call bitstring_to_list_ab(particle, particle_list, N_particles, N_int)
 
-  integer :: l_a, nmax
+  integer :: l_a, nmax, idx
   integer, allocatable :: indices(:), exc_degree(:), iorder(:)
   allocate (indices(N_det),  &
             exc_degree(max(N_det_alpha_unique,N_det_beta_unique)))
@@ -331,7 +331,9 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
     do l_a=psi_bilinear_matrix_columns_loc(j), psi_bilinear_matrix_columns_loc(j+1)-1
       i = psi_bilinear_matrix_rows(l_a)
       if (nt + exc_degree(i) <= 4) then
-        indices(k) = psi_det_sorted_order(psi_bilinear_matrix_order(l_a))
+        idx = psi_det_sorted_order(psi_bilinear_matrix_order(l_a))
+        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
+        indices(k) = idx
         k=k+1
       endif
     enddo
@@ -350,9 +352,11 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
       i = psi_bilinear_matrix_transp_columns(l_a)
       if (exc_degree(i) < 3) cycle
       if (nt + exc_degree(i) <= 4) then
-        indices(k) = psi_det_sorted_order(                   &
-                        psi_bilinear_matrix_order(           &
-                          psi_bilinear_matrix_transp_order(l_a)))
+        idx = psi_det_sorted_order(                   &
+                 psi_bilinear_matrix_order(           &
+                 psi_bilinear_matrix_transp_order(l_a)))
+        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
+        indices(k) = idx
         k=k+1
       endif
     enddo
