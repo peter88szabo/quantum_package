@@ -13,7 +13,7 @@ BEGIN_PROVIDER [ integer, N_det_generators ]
  N_det_generators = N_det
  do i=1,N_det
    norm = norm - psi_average_norm_contrib_sorted(i)
-   if (norm - 1.d-12 < 1.d0 - threshold_generators) then
+   if (norm - 1.d-10 < 1.d0 - threshold_generators) then
      N_det_generators = i
      exit
    endif

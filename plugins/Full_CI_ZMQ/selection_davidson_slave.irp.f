@@ -50,7 +50,8 @@ subroutine run_wf
 
   PROVIDE psi_det psi_coef threshold_generators threshold_selectors state_average_weight mpi_master
   PROVIDE zmq_state N_det_selectors pt2_stoch_istate N_det pt2_e0_denominator
-  PROVIDE N_det_generators N_states N_states_diag
+  PROVIDE N_det_generators N_states N_states_diag psi_energy
+
   IRP_IF MPI
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   IRP_ENDIF
@@ -155,6 +156,12 @@ subroutine run_wf
       ! PT2
       ! ---
 
+      IRP_IF MPI
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (ierr /= MPI_SUCCESS) then
+          print *,  irp_here, 'error in barrier'
+        endif
+      IRP_ENDIF
       call wall_time(t0)
       if (zmq_get_psi(zmq_to_qp_run_socket,1) == -1) cycle
       if (zmq_get_N_det_generators (zmq_to_qp_run_socket, 1) == -1) cycle
@@ -177,13 +184,19 @@ subroutine run_wf
 
       call wall_time(t1)
       call write_double(6,(t1-t0),'Broadcast time')
+      IRP_IF MPI
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (ierr /= MPI_SUCCESS) then
+          print *,  irp_here, 'error in barrier'
+        endif
+      IRP_ENDIF
 
-      logical :: lstop
-      lstop = .False.
-      !$OMP PARALLEL PRIVATE(i)
-      i = omp_get_thread_num()
-      call run_pt2_slave(0,i,pt2_e0_denominator)
-      !$OMP END PARALLEL
+      if (.true.) then
+        !$OMP PARALLEL PRIVATE(i)
+        i = omp_get_thread_num()
+        call run_pt2_slave(0,i,pt2_e0_denominator)
+        !$OMP END PARALLEL
+      endif
       print *,  'PT2 done'
       FREE state_average_weight
 
