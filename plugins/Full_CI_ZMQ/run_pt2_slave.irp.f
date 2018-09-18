@@ -155,9 +155,9 @@ subroutine pull_pt2_results(zmq_socket_pull, index, pt2, task_id, n_tasks)
   use selection_types
   implicit none
   integer(ZMQ_PTR), intent(in)   :: zmq_socket_pull
-  double precision, intent(inout) :: pt2(N_states,n_tasks_max)
-  integer, intent(out) :: index(n_tasks_max)
-  integer, intent(out) :: n_tasks, task_id(n_tasks_max)
+  double precision, intent(inout) :: pt2(N_states,*)
+  integer, intent(out) :: index(*)
+  integer, intent(out) :: n_tasks, task_id(*)
   integer :: rc, rn, i
 
   rc = f77_zmq_recv( zmq_socket_pull, n_tasks, 4, 0)
