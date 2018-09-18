@@ -167,7 +167,6 @@ subroutine decode_exc(exc,degree,h1,p1,h2,p2,s1,s2)
   end select
 end
 
-
 subroutine get_double_excitation(det1,det2,exc,phase,Nint)
   use bitmasks
   implicit none
@@ -311,6 +310,31 @@ subroutine get_double_excitation(det1,det2,exc,phase,Nint)
   phase = phase_dble(iand(nperm,1))
   
 end
+
+subroutine get_phasemask_bit(det1, pm, Nint)
+  use bitmasks
+  implicit none
+  integer, intent(in) :: Nint
+  integer(bit_kind), intent(in) :: det1(Nint,2)
+  integer(bit_kind), intent(out) :: pm(Nint,2)
+  integer(bit_kind) :: tmp
+ integer :: ispin, i
+  do ispin=1,2
+  tmp = 0_8
+  do i=1,Nint
+    pm(i,ispin) = xor(det1(i,ispin), ishft(det1(i,ispin), 1))
+    pm(i,ispin) = xor(pm(i,ispin), ishft(pm(i,ispin), 2))
+    pm(i,ispin) = xor(pm(i,ispin), ishft(pm(i,ispin), 4))
+    pm(i,ispin) = xor(pm(i,ispin), ishft(pm(i,ispin), 8))
+    pm(i,ispin) = xor(pm(i,ispin), ishft(pm(i,ispin), 16))
+    pm(i,ispin) = xor(pm(i,ispin), ishft(pm(i,ispin), 32))
+    pm(i,ispin) = xor(pm(i,ispin), tmp)
+    if(iand(popcnt(det1(i,ispin)), 1) == 1) tmp = not(tmp)
+  end do
+  end do
+end subroutine
+
+
 
 subroutine get_mono_excitation(det1,det2,exc,phase,Nint)
   use bitmasks
@@ -568,7 +592,6 @@ subroutine i_H_j_s2(key_i,key_j,Nint,hij,s2)
       call get_mono_excitation_from_fock(key_i,key_j,p,m,spin,phase,hij)
       
     case (0)
-      print *,irp_here,": ZERO"
       double precision, external :: diag_S_mat_elem
       s2 = diag_S_mat_elem(key_i,Nint)
       hij = diag_H_mat_elem(key_i,Nint)

@@ -1,14 +1,5 @@
 use bitmasks
 
-BEGIN_PROVIDER [ integer, fragment_count ]
-  implicit none
-  BEGIN_DOC
-  ! Number of fragments for the deterministic part
-  END_DOC
-  fragment_count = (elec_alpha_num-n_core_orb)**2
-END_PROVIDER
-
-
 subroutine assert(cond, msg)
   character(*), intent(in) :: msg
   logical, intent(in) :: cond
@@ -46,11 +37,11 @@ subroutine get_mask_phase(det, phasemask)
 end subroutine
 
 
-subroutine select_connected(i_generator,E0,pt2,b,subset)
+subroutine select_connected(i_generator,E0,pt2,b,subset,csubset)
   use bitmasks
   use selection_types
   implicit none
-  integer, intent(in)            :: i_generator, subset
+  integer, intent(in)            :: i_generator, subset, csubset
   type(selection_buffer), intent(inout) :: b
   double precision, intent(inout)  :: pt2(N_states)
   integer :: k,l
@@ -71,7 +62,7 @@ subroutine select_connected(i_generator,E0,pt2,b,subset)
       particle_mask(k,1) = iand(generators_bitmask(k,1,s_part,l), not(psi_det_generators(k,1,i_generator)) )
       particle_mask(k,2) = iand(generators_bitmask(k,2,s_part,l), not(psi_det_generators(k,2,i_generator)) )
     enddo
-    call select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_diag_tmp,E0,pt2,b,subset)
+    call select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_diag_tmp,E0,pt2,b,subset,csubset)
   enddo
   deallocate(fock_diag_tmp)
 end subroutine
@@ -266,7 +257,7 @@ subroutine get_m0(gen, phasemask, bannedOrb, vect, mask, h, p, sp, coefs)
 end 
 
 
-subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_diag_tmp,E0,pt2,buf,subset)
+subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_diag_tmp,E0,pt2,buf,subset,csubset)
   use bitmasks
   use selection_types
   implicit none
@@ -274,7 +265,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
 !            WARNING /!\ : It is assumed that the generators and selectors are psi_det_sorted
   END_DOC
   
-  integer, intent(in)            :: i_generator, subset
+  integer, intent(in)            :: i_generator, subset, csubset
   integer(bit_kind), intent(in)  :: hole_mask(N_int,2), particle_mask(N_int,2)
   double precision, intent(in)   :: fock_diag_tmp(mo_tot_num)
   double precision, intent(in)   :: E0(N_states)
@@ -298,8 +289,6 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   integer(bit_kind), allocatable:: preinteresting_det(:,:,:)
   allocate (preinteresting_det(N_int,2,N_det))
 
-  PROVIDE fragment_count
-
   monoAdo = .true.
   monoBdo = .true.
 
@@ -319,7 +308,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   call bitstring_to_list_ab(hole    , hole_list    , N_holes    , N_int)
   call bitstring_to_list_ab(particle, particle_list, N_particles, N_int)
 
-  integer :: l_a, nmax
+  integer :: l_a, nmax, idx
   integer, allocatable :: indices(:), exc_degree(:), iorder(:)
   allocate (indices(N_det),  &
             exc_degree(max(N_det_alpha_unique,N_det_beta_unique)))
@@ -342,7 +331,10 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
     do l_a=psi_bilinear_matrix_columns_loc(j), psi_bilinear_matrix_columns_loc(j+1)-1
       i = psi_bilinear_matrix_rows(l_a)
       if (nt + exc_degree(i) <= 4) then
-        indices(k) = psi_det_sorted_order(psi_bilinear_matrix_order(l_a))
+        idx = psi_det_sorted_order(psi_bilinear_matrix_order(l_a))
+!        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
+        if (idx > N_det_selectors) cycle
+        indices(k) = idx
         k=k+1
       endif
     enddo
@@ -361,13 +353,17 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
       i = psi_bilinear_matrix_transp_columns(l_a)
       if (exc_degree(i) < 3) cycle
       if (nt + exc_degree(i) <= 4) then
-        indices(k) = psi_det_sorted_order(                   &
-                        psi_bilinear_matrix_order(           &
-                          psi_bilinear_matrix_transp_order(l_a)))
+        idx = psi_det_sorted_order(                   &
+                 psi_bilinear_matrix_order(           &
+                 psi_bilinear_matrix_transp_order(l_a)))
+!        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
+        if (idx > N_det_selectors) cycle
+        indices(k) = idx
         k=k+1
       endif
     enddo
   enddo
+
   deallocate(exc_degree)
   nmax=k-1
 
@@ -415,14 +411,35 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   end do
   deallocate(indices)
   
-
   allocate(minilist(N_int, 2, N_det_selectors), fullminilist(N_int, 2, N_det))
   allocate(banned(mo_tot_num, mo_tot_num,2), bannedOrb(mo_tot_num, 2))
   allocate (mat(N_states, mo_tot_num, mo_tot_num))
   maskInd = -1
-  integer :: nb_count
+
+  integer :: nb_count, maskInd_save, monoBdo_save
+  logical :: found
   do s1=1,2
     do i1=N_holes(s1),1,-1   ! Generate low excitations first
+
+      found = .False.
+      monoBdo_save = monoBdo
+      maskInd_save = maskInd
+      do s2=s1,2
+        ib = 1
+        if(s1 == s2) ib = i1+1
+        do i2=N_holes(s2),ib,-1
+          maskInd += 1
+          if(mod(maskInd, csubset) == (subset-1)) then  
+            found = .True.
+          end if
+        enddo
+        if(s1 /= s2) monoBdo = .false.
+      enddo
+
+      if (.not.found) cycle
+      monoBdo = monoBdo_save
+      maskInd = maskInd_save
+
       h1 = hole_list(i1,s1)
       call apply_hole(psi_det_generators(1,1,i_generator), s1,h1, pmask, ok, N_int)
       
@@ -535,8 +552,6 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
           enddo
         end if
       end do
-      
-
 
       do s2=s1,2
         sp = s1
@@ -571,7 +586,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
           end if
 
           maskInd += 1
-          if(subset == 0 .or. mod(maskInd, fragment_count) == (subset-1)) then  
+          if(mod(maskInd, csubset) == (subset-1)) then  
             
             call spot_isinwf(mask, fullminilist, i_generator, fullinteresting(0), banned, fullMatch, fullinteresting)
             if(fullMatch) cycle

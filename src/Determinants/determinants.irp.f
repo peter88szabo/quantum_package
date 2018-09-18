@@ -45,6 +45,10 @@ BEGIN_PROVIDER [ integer, N_det ]
     endif
     call write_int(6,N_det,'Number of determinants')
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -89,6 +93,10 @@ BEGIN_PROVIDER [ integer, psi_det_size ]
     psi_det_size = max(psi_det_size,100000)
     call write_int(6,psi_det_size,'Dimension of the psi arrays')
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -154,6 +162,10 @@ BEGIN_PROVIDER [ integer(bit_kind), psi_det, (N_int,2,psi_det_size) ]
       enddo
     endif
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -212,6 +224,10 @@ BEGIN_PROVIDER [ double precision, psi_coef, (psi_det_size,N_states) ]
       endif
     endif
   endif
+  IRP_IF MPI_DEBUG
+    print *,  irp_here, mpi_rank
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  IRP_ENDIF
   IRP_IF MPI
     include 'mpif.h'
     integer                        :: ierr
@@ -454,6 +470,26 @@ end
 
 
 
+subroutine save_wavefunction_truncated(thr)
+  implicit none
+  double precision, intent(in) :: thr
+  use bitmasks
+  BEGIN_DOC
+  !  Save the wave function into the EZFIO file
+  END_DOC
+  integer :: N_det_save,i
+  N_det_save = N_det
+  do i=1,N_det
+    if (psi_average_norm_contrib_sorted(i) < thr) then
+      N_det_save = i
+      exit
+    endif
+  enddo
+  if (mpi_master) then
+    call save_wavefunction_general(N_det_save,min(N_states,N_det_save),psi_det_sorted,size(psi_coef_sorted,1),psi_coef_sorted)
+  endif
+end
+
 subroutine save_wavefunction
   implicit none
   use bitmasks
@@ -513,23 +549,18 @@ subroutine save_wavefunction_general(ndet,nstates,psidet,dim_psicoef,psicoef)
     deallocate (psi_det_save)
     
     allocate (psi_coef_save(ndet,nstates))
-    double precision               :: accu_norm(nstates)
-    accu_norm = 0.d0
+    double precision               :: accu_norm
     do k=1,nstates
+      accu_norm = 0.d0
       do i=1,ndet
-        accu_norm(k) = accu_norm(k) + psicoef(i,k) * psicoef(i,k)
-        psi_coef_save(i,k) = psicoef(i,k)
+        accu_norm = accu_norm + psicoef(i,k) * psicoef(i,k)
       enddo
-      if (accu_norm(k) == 0.d0) then
-        accu_norm(k) = 1.e-12
+      if (accu_norm == 0.d0) then
+        accu_norm = 1.e-12
       endif
-    enddo
-    do k = 1, nstates
-      accu_norm(k) = 1.d0/dsqrt(accu_norm(k))
-    enddo
-    do k=1,nstates
+      accu_norm = 1.d0/dsqrt(accu_norm)
       do i=1,ndet
-        psi_coef_save(i,k) = psi_coef_save(i,k) * accu_norm(k)
+        psi_coef_save(i,k) = psicoef(i,k) * accu_norm
       enddo
     enddo
     
@@ -721,6 +752,7 @@ subroutine apply_excitation(det, exc, res, ok, Nint)
       case default
       print *, degree
       print *, "apply ex"
+!      print *,  1.d0/0.d0 ! For traceback
       STOP
   end select
   ! END INLINE

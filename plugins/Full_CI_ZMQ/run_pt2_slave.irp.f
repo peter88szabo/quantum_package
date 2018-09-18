@@ -22,12 +22,11 @@ subroutine run_pt2_slave(thread,iproc,energy)
   logical :: done
 
   double precision,allocatable :: pt2(:,:)
-  integer :: n_tasks, k, n_tasks_max
+  integer :: n_tasks, k
   integer, allocatable :: i_generator(:), subset(:)
 
-  n_tasks_max = N_det_generators/100+1
-  allocate(task_id(n_tasks_max), task(n_tasks_max))
-  allocate(pt2(N_states,n_tasks_max), i_generator(n_tasks_max), subset(n_tasks_max))
+  allocate(task_id(pt2_n_tasks_max), task(pt2_n_tasks_max))
+  allocate(pt2(N_states,pt2_n_tasks_max), i_generator(pt2_n_tasks_max), subset(pt2_n_tasks_max))
 
   zmq_to_qp_run_socket = new_zmq_to_qp_run_socket()
 
@@ -44,10 +43,11 @@ subroutine run_pt2_slave(thread,iproc,energy)
   call create_selection_buffer(0, 0, buf)
 
   done = .False.
+  n_tasks = 1
   do while (.not.done)
 
-    n_tasks = max(1,n_tasks)
-    n_tasks = min(n_tasks,n_tasks_max)
+!    n_tasks = max(1,n_tasks)
+!    n_tasks = min(pt2_n_tasks_max,n_tasks)
 
     integer, external :: get_tasks_from_taskserver
     if (get_tasks_from_taskserver(zmq_to_qp_run_socket,worker_id, task_id, task, n_tasks) == -1) then
@@ -62,13 +62,17 @@ subroutine run_pt2_slave(thread,iproc,energy)
     enddo
 
     double precision :: time0, time1
-    call wall_time(time0)
+!    call wall_time(time0)
     do k=1,n_tasks
         pt2(:,k) = 0.d0
         buf%cur = 0
-        call select_connected(i_generator(k),energy,pt2(1,k),buf,subset(k))
+!double precision :: time2
+!call wall_time(time2)
+        call select_connected(i_generator(k),energy,pt2(1,k),buf,subset(k),pt2_F(i_generator(k)))
+!call wall_time(time1)
+!print *,  i_generator(1), time1-time2, n_tasks, pt2_F(i_generator(1))
     enddo
-    call wall_time(time1)
+!    call wall_time(time1)
 
     integer, external :: tasks_done_to_taskserver
     if (tasks_done_to_taskserver(zmq_to_qp_run_socket,worker_id,task_id,n_tasks) == -1) then
@@ -76,9 +80,8 @@ subroutine run_pt2_slave(thread,iproc,energy)
     endif
     call push_pt2_results(zmq_socket_push, i_generator, pt2, task_id, n_tasks)
 
-    ! Try to adjust n_tasks around 1 second per job
-    n_tasks = min(n_tasks,int( 1.d0*dble(n_tasks) / (time1 - time0 + 1.d-9)))+1
-!     n_tasks = n_tasks+1
+    ! Try to adjust n_tasks around nproc seconds per job
+!    n_tasks = min(2*n_tasks,int( dble(n_tasks * nproc) / (time1 - time0 + 1.d0)))
   end do
 
   integer, external :: disconnect_from_taskserver
@@ -201,12 +204,5 @@ IRP_ENDIF
 
 end subroutine
  
- 
-BEGIN_PROVIDER [ double precision, pt2_workload, (N_det_generators) ]
-  integer :: i
-  do i=1,N_det_generators
-    pt2_workload(i) = dfloat(N_det_generators - i + 1)**2
-  end do
-  pt2_workload = pt2_workload / sum(pt2_workload)
-END_PROVIDER
+
             
