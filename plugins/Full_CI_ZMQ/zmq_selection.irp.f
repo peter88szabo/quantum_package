@@ -52,16 +52,16 @@ subroutine ZMQ_selection(N_in, pt2)
   endif
 
   integer, external :: add_task_to_taskserver
-  character(len=64000)           :: task
+  character(len=100000)           :: task
   integer :: j,k,ipos
   ipos=1
   task = ' ' 
 
-  do i= 1, N_det_generators
+ do i= 1, N_det_generators
     do j=1,pt2_F(pt2_J(i))
       write(task(ipos:ipos+30),'(I9,1X,I9,1X,I9,''|'')') j, pt2_J(i), N
       ipos += 30
-      if (ipos > 63970) then
+      if (ipos > 100000-30) then
         if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
           stop 'Unable to add task to task server'
         endif

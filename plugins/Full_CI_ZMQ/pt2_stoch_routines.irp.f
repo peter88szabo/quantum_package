@@ -16,6 +16,7 @@ END_PROVIDER
   integer :: e
   e = elec_num - n_core_orb * 2
   pt2_n_tasks_max = 1+min((e*(e-1))/2, int(dsqrt(dble(N_det_generators)))/10)
+  pt2_n_tasks_max = 1
   do i=1,N_det_generators
     if (maxval(dabs(psi_coef_sorted_gen(i,1:N_states))) > 0.001d0) then
       pt2_F(i) = pt2_n_tasks_max
@@ -178,7 +179,7 @@ subroutine ZMQ_pt2(E, pt2,relative_error, error)
         do j=1,pt2_F(pt2_J(i))
           write(task(ipos:ipos+20),'(I9,1X,I9,''|'')') j, pt2_J(i)
           ipos += 20
-          if (ipos > len(task)-20) then
+          if (ipos > 100000-20) then
             if (add_task_to_taskserver(zmq_to_qp_run_socket,trim(task(1:ipos))) == -1) then
               stop 'Unable to add task to task server'
             endif
