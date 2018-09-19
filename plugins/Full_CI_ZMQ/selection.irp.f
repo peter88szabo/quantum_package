@@ -332,8 +332,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
       i = psi_bilinear_matrix_rows(l_a)
       if (nt + exc_degree(i) <= 4) then
         idx = psi_det_sorted_order(psi_bilinear_matrix_order(l_a))
-!        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
-        if (idx > N_det_selectors) cycle
+        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
         indices(k) = idx
         k=k+1
       endif
@@ -356,8 +355,7 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
         idx = psi_det_sorted_order(                   &
                  psi_bilinear_matrix_order(           &
                  psi_bilinear_matrix_transp_order(l_a)))
-!        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
-        if (idx > N_det_selectors) cycle
+        if (psi_average_norm_contrib_sorted(idx) < 1.d-12) cycle
         indices(k) = idx
         k=k+1
       endif
@@ -374,8 +372,8 @@ subroutine select_singles_and_doubles(i_generator,hole_mask,particle_mask,fock_d
   call isort(indices,iorder,nmax)
   deallocate(iorder)
 
-  allocate(preinteresting(0:N_det_selectors), prefullinteresting(0:N_det), &
-            interesting(0:N_det_selectors), fullinteresting(0:N_det))
+  allocate(preinteresting(0:N_det), prefullinteresting(0:N_det), &
+            interesting(0:N_det), fullinteresting(0:N_det))
   preinteresting(0) = 0
   prefullinteresting(0) = 0
   
